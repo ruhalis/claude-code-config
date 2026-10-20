@@ -42,13 +42,15 @@ One toolchain per machine, shared by every project: **pure ESP-IDF**, no Arduino
 
    macOS ships drivers for CP210x, FTDI and WCH CH340/CH9102 bridges. A CH343 needs none: it is a CDC device and shows up as `/dev/cu.usbmodem<serial>`, like the native USB port (SKILL.md step 1 tells them apart by vendor ID). So nothing appearing usually means a charge-only cable or a bad port. Third-party drivers (Silicon Labs VCP, WCH) are DriverKit extensions enabled under System Settings, and only needed for chips the built-in ones skip.
 
-5. Smoke-test with the stock example, then leave the monitor with `Ctrl+]`:
+5. Smoke-test with the stock example at your own terminal, then leave the monitor with `Ctrl+]`:
 
    ```bash
    cp -r ~/esp/esp-idf/examples/get-started/hello_world ~/esp/hello_world && cd ~/esp/hello_world
    idf.py set-target <chip> && idf.py build
    idf.py -p /dev/cu.usbserial-XXXXXXXX flash monitor
    ```
+
+   Claude Code does not run this block: it builds and flashes through SKILL.md steps 3 and 4 (a flash only on an ask, to a resolved port) and reads the boot with `serial_tail.py` (step 5), because `monitor` never runs from a tool call.
 
 6. `bash "${CLAUDE_SKILL_DIR}/scripts/check_toolchain.sh"` should now exit 0 and list the board.
 

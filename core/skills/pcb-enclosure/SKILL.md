@@ -24,7 +24,7 @@ Personal skill for printed parts around the user's own boards. It does not model
 ## What it reads from the project
 
 - `CLAUDE.md` `## Hardware` -> `kicad:` (the path kicad-review also uses to find the board).
-- Optional, new: a `## Print` section with `printer:`, `nozzle:`, `material:`. If absent, assume 0.4 mm nozzle, PLA or PETG, and say so.
+- Optional: a `## Print` section with `printer:`, `nozzle:`, `material:`. If absent, assume 0.4 mm nozzle, PLA or PETG, and say so.
 
 ## Workflow
 
@@ -36,7 +36,7 @@ Personal skill for printed parts around the user's own boards. It does not model
    - Derive mounting holes from its cylindrical faces (centre and diameter).
    - Check the part against `connectors.step` for interference.
    - Apply the values in `references/fdm-fits.md`.
-4. Snapshot: `cadgen step snapshot STEP/<x>.step tmp/review.png`, then Read the PNG. Mandatory, never skip.
+4. Snapshot: `cadgen step snapshot STEP/<x>.step tmp/review.png`, then Read the PNG before going on: it is the only view of the part you get.
 5. Run `text-to-cad:dfam-check`.
 6. Export STL and 3MF (the `@stl` / `@3mf` outputs of the model script).
 7. Report overall dimensions, the fits used, and what to verify after printing (hole fit, board seating, connector access, lid closure).

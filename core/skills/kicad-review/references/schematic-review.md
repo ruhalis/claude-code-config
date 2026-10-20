@@ -4,7 +4,7 @@ Walk every row. Each row names the evidence that closes it: `net` = the netlist 
 PDF you have looked at through its crops in `review/png/` (cite the crop), `ds` = a fetched datasheet (cite URL and
 page), `note` = the project's design note or `## Hardware` section, `ERC` = the step-2 `erc_drc.sh erc` result. A
 row with no evidence is reported as `unverified`, never as pass. Report as a table
-`sev | ref/net | finding | source`, errors first, at most ~25 rows, the rest summarised by type.
+`sev | ref/net | finding | source`, errors first, one row per finding the user acts on, repeated or info-level findings summarised by type.
 
 ## A. Power tree
 

@@ -82,7 +82,7 @@ Resolve the project the way esp-idf resolves ports: the section, else a path nam
 
 ## Procedure
 
-Shell variables do not persist between Bash calls, so every block below first sets the ones it uses: `K` (kicad-cli), `B` (the board directory; `<b>` is the board's file name stem). The working directory does persist: run from the repo root.
+Shell variables do not persist between Bash calls, so every block below first sets `B` (the board directory; `<b>` is the board's file name stem). The working directory does persist: run from the repo root.
 
 ### 0. Environment, once per session
 
@@ -131,7 +131,7 @@ B=hardware/<b>
 ### 2. ERC
 
 ```bash
-K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli; B=hardware/<b>
+B=hardware/<b>
 bash "${CLAUDE_SKILL_DIR}/scripts/erc_drc.sh" erc "$B/<b>.kicad_sch"
 ```
 
@@ -139,12 +139,12 @@ Exit 0 clean; 5 violations (any severity); 3 the schematic did not load (quote t
 
 ### 3. Schematic-stage review
 
-Walk `references/schematic-review.md` against the netlist, the PDF, the header, the ERC result and the fetched datasheets. Report as a table `sev | ref/net | finding | source`, errors first, at most about 25 rows; summarise the rest by type. Every row names its evidence or says `unverified`.
+Walk `references/schematic-review.md` against the netlist, the PDF, the header, the ERC result and the fetched datasheets. Report as a table `sev | ref/net | finding | source`, errors first: one row for each finding the user acts on in the GUI, repeated or info-level findings summarised by type. Every row names its evidence or says `unverified`.
 
 ### 4. Pin diff against firmware
 
 ```bash
-K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli; B=hardware/<b>
+B=hardware/<b>
 python3 "${CLAUDE_SKILL_DIR}/scripts/pin_diff.py" --netlist "$B/review/board.net" --header <pins:> --mcu <mcu:> > "$B/review/pin_diff.txt"; echo "exit $?"; cat "$B/review/pin_diff.txt"
 ```
 
@@ -153,7 +153,7 @@ The table is kept in `review/pin_diff.txt` for the step-7 manifest. Exit 2 means
 ### 5. DRC
 
 ```bash
-K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli; B=hardware/<b>
+B=hardware/<b>
 bash "${CLAUDE_SKILL_DIR}/scripts/erc_drc.sh" drc "$B/<b>.kicad_pcb"
 ```
 
@@ -173,7 +173,7 @@ It writes `review/stats.json`; `front.pdf` (F.Cu, F.Silkscreen, Edge.Cuts) and `
 Only after steps 2, 4 and 5 are clean, or every remaining item has been explicitly accepted by the user in this conversation. If the project has an `ORDER.md` (earlier order fields, delivery country, fab route), read it first.
 
 ```bash
-K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli; B=hardware/<b>
+B=hardware/<b>
 bash "${CLAUDE_SKILL_DIR}/scripts/fab_export.sh" "$B/<b>.kicad_pcb" "$B/<b>.kicad_sch" "$B/fab/<date>"
 ```
 
@@ -183,7 +183,7 @@ Last, the script writes `<outdir>/MANIFEST.txt`, which ties the set to what it c
 
 ### 8. Report
 
-One short paragraph per stage run: counts by severity, the three findings that matter most, what the user changes in the GUI next. Full JSON stays in `review/`.
+One short paragraph per stage run: counts by severity, the findings that matter most, what the user changes in the GUI next. Full JSON stays in `review/`.
 
 ### 9. Re-check after a change
 
@@ -224,3 +224,7 @@ Exit 0 ends `identical except timestamps and G04 comments`: nothing a fab reads 
 - `selftest.sh` fails: quote its FAIL lines and stop; a script no longer matches the fixture it was written against.
 - No pin header: skip step 4 and say so. Symbol without numbered pin names: `pin_diff.py` says which pins it could not map; ask for a `--pinmap`, never guess one.
 - Asked to place, route, generate a schematic, or edit a KiCad file: decline, name the step whose output the user needs instead.
+
+## Orchestration
+
+The review is the task: exports, ERC, DRC, the pin diff and reading the crops are run by the agent doing the review (the main session, a fork, or `general-purpose`, which can load this skill). `selftest.sh` and the known-project re-run before a `kicad-version` bump are validation runs: from the main session they go to `verifier`, which has Bash but neither this skill nor `${CLAUDE_SKILL_DIR}`. Give it the command by the installed path, `bash "$HOME/.claude/skills/kicad-review/scripts/selftest.sh"`, the step-0 exit contract (0 passed; 1, quote every FAIL line), and for the re-run the step-0 table plus the rule that it writes no KiCad file and does not edit `kicad-version`.

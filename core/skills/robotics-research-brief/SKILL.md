@@ -58,7 +58,7 @@ The smallest concrete test (≤1 day) that would confirm the bottom line. Includ
 Links.
 ```
 
-Keep the whole thing under ~1,200 words. Prose inside sections, no nested bullets. ASCII diagrams only if they show a real mechanism (pipeline, data flow).
+Match the brief's length to what the decision needs: cover the substance, but don't pad it with filler sections, repeated points or boilerplate. Prose inside sections, no nested bullets. ASCII diagrams only if they show a real mechanism (pipeline, data flow).
 
 ## Check before saving
 
@@ -68,7 +68,7 @@ Before writing the file, check the draft against the template (peer review: agai
 - Brief mode only: every Candidates cell is filled or marked "unknown".
 - Brief mode only: every Key evidence line has a number, a URL, and a provenance tag ([real|sim], embodiment, N trials, model version; device and precision for inference numbers; or "(unverified)" if the primary source wasn't opened).
 - Brief mode only: Next experiment names dataset/env, metric, success threshold, and the GPU it runs on (or the machine, e.g. H200 overnight).
-- Under ~1,200 words (peer review has no fixed length target — stay concise).
+- No padding: no filler section, repeated point or boilerplate (peer review too).
 - No nested bullets — prose inside sections, as the template uses; peer review follows the skeleton's own structure.
 
 Fix anything that fails, then re-check before saving.

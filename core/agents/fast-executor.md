@@ -26,4 +26,4 @@ Your final message is consumed by another agent. Report concisely:
 2. **Files touched** - list of paths.
 3. **Flags** - only if something needs the orchestrator's attention: deviations from the instructions, pre-existing failures noticed, parts intentionally skipped and why, additions you think would help but didn't make. Omit this section if there are none.
 
-No process narration, no restating the task. Keep it under ~150 words.
+No process narration, no restating the task: the orchestrator reads only the three sections above.
