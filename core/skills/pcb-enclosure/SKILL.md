@@ -28,11 +28,11 @@ Personal skill for printed parts around the user's own boards. It does not model
 
 ## Workflow
 
-0. Run `cadgen doctor`. `cadgen` is shorthand for `uvx --no-config --managed-python --python 3.13 --from cadgen==0.7.21 cadgen`; the same prefix with `python` runs model scripts. In zsh use a shell function, not a string variable. Commands run from the project root; layout is `src/<name>.py`, outputs in `STEP/`, `STL/`, `3MF/`, snapshots in `tmp/`.
+0. Run `cadgen doctor`. `cadgen` is shorthand for `uvx --no-config --managed-python --python 3.13 --from cadgen==0.7.21 cadgen`; the same prefix with `python` runs model scripts. In zsh use a shell function, not a string variable. The CAD project root is `cad/` next to the pcb file, where `board_export.sh` writes `board/`; run every command from there. Layout: `src/<name>.py`, outputs in `STEP/`, `STL/`, `3MF/`, snapshots in `tmp/`.
 1. Read the repo `CLAUDE.md` `## Hardware` section for the `kicad:` path.
 2. Run `scripts/board_export.sh <that path>`. Set the drill/aux origin on a mounting hole or board corner in pcbnew first; it is the datum for every file. Confirm the Y axis / origin convention of the STEP once per project by comparing one known hole position between `positions.csv` and the STEP. Checked on aquila-fc with kicad-cli 10.0.5: X and Y in `positions.csv` match the STEP `CARTESIAN_POINT` values exactly, Y is negative below the origin (pcbnew's Y-down), Z=0 is the board bottom.
-3. Invoke the `text-to-cad:cad` skill and model in `cad/src/<part>.py`:
-   - `cadgen.read_step("cad/board/board.step")` gives a build123d Compound.
+3. Invoke the `text-to-cad:cad` skill and model in `src/<part>.py`:
+   - `cadgen.read_step("board/board.step")` gives a build123d Compound.
    - Derive mounting holes from its cylindrical faces (centre and diameter).
    - Check the part against `connectors.step` for interference.
    - Apply the values in `references/fdm-fits.md`.

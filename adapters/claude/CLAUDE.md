@@ -19,7 +19,7 @@ You are the orchestrator, and your context is the scarce resource: once it fills
 
 Reading the one file you are about to edit, a single edit, a grep to confirm a name, and hardware actions (flashing, resets, anything that moves a motor), because their safety steps live in skills the agents can't load. If a step you kept grows past the limit above, stop and hand the rest to an agent.
 
-CAD model runs and snapshots (`cadgen`, `python src/<part>.py`, the text-to-cad plugin's `cad` skill) are design iteration, not validation: the agent doing the modelling must look at the PNG and change the model. Run them in the main session, a fork or `general-purpose`, never `verifier`, which can't load skills.
+Design iteration is not validation: CAD model runs and snapshots (`cadgen` and the model scripts under `src/`, through the text-to-cad plugin's `cad` skill), and LED animation rounds (sheets, the C/JS parity check and the byte compare against the baseline, through the `led-animation` skill). The agent doing the design must look at the picture and change the design, so run them in the main session, a fork or `general-purpose`, never `verifier`, which can't load skills. The firmware build that follows an LED round is still a build.
 
 ## Splitting and handing off
 
@@ -41,8 +41,8 @@ The advisor (`advisorModel` in settings, Opus by default) is a server-side secon
 
 - Subagents run in the background. Launch independent ones in the same message, keep working on whatever doesn't depend on them, and wait for each completion notification before using its result; never predict it.
 - A `PreToolUse` hook (`~/.claude/hooks/guard-main-session.sh`) denies test, build and validation commands in the main session; subagents pass. The denial text names the verifier. CLAUDE.md is advice, the hook is the enforcement.
-- Subagent models are pinned so nothing inherits the session model: `deep-reasoner` runs on Opus at `xhigh`, `fast-executor` on Sonnet at `medium`, `verifier` on Sonnet at `medium`, `Explore` on Haiku at `low`; `general-purpose` falls back to Sonnet through `CLAUDE_CODE_SUBAGENT_MODEL`; the built-in `Plan` ignores that variable and runs on the session model. Fable stays with the orchestrator.
-- Escalate one agent to the session model only by passing `model: "fable"` on that Agent call, and only after an Opus attempt on the same problem has come back wrong or inconclusive, or for a milestone check on a high-stakes change (`verifier` with `model: "opus"`). Never set it as a default.
+- Subagent models are pinned so nothing inherits the session model: `deep-reasoner` runs on Opus at `xhigh`, `fast-executor` on Sonnet at `medium`, `verifier` on Sonnet at `medium`, `Explore` on Haiku at `low`; `general-purpose` falls back to Sonnet through `CLAUDE_CODE_SUBAGENT_MODEL`; the built-in `Plan` ignores that variable and runs on the session model.
+- Escalate one agent to Fable (`model: "fable"` on that Agent call) only after an Opus attempt on the same problem has come back wrong or inconclusive; for a milestone check on a high-stakes change, run `verifier` with `model: "opus"`. Never set either as a default.
 - `deep-reasoner`: read-only (Read, Grep, Glob, Bash, WebSearch, WebFetch); returns a decision.
 - `fast-executor`: Read, Edit, Write, Grep, Glob, Bash; runs the targeted test for what it touched.
 - `verifier`: read-only (Read, Grep, Glob, Bash); runs the checks, reports evidence and fixes nothing.
@@ -62,4 +62,4 @@ Use `uv` for all Python setup and execution; never bare `pip install`, `python -
 - **Interpreters:** `uv python install <version>`; pin with `uv python pin`.
 - **No `pyproject.toml` and not worth adding one:** `uv venv` then `uv pip install`.
 
-Exceptions: toolchains that ship their own Python keep it (ESP-IDF's environment from `install.sh`/`export.sh`, Isaac Sim/Lab's `python.sh`/`isaaclab.sh`, KiCad's bundled Python), and a repo already on another tool stays on it unless the user asks to migrate.
+Exceptions: toolchains that ship their own Python keep it (ESP-IDF's environment from `install.sh`/`export.sh`, Isaac Sim/Lab's `python.sh`/`isaaclab.sh`, KiCad's bundled Python), a repo already on another tool stays on it unless the user asks to migrate, and the stdlib-only scripts bundled with a skill run with plain `python3`, since they install nothing and create no environment.
