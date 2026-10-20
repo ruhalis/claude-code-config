@@ -5,8 +5,9 @@
 # pass through untouched. Set GUARD_MAIN_SESSION_OFF=1 in settings `env` to
 # disable without removing the hook. Exit 0 with no output = no decision.
 set -u
-command -v jq >/dev/null 2>&1 || exit 0
 [ "${GUARD_MAIN_SESSION_OFF:-0}" = "1" ] && exit 0
+# Fail closed without jq: exit 1 is a hook failure, so onFailure "block" stops the call.
+command -v jq >/dev/null 2>&1 || { echo "guard-main-session: jq missing; install jq (brew install jq) or set GUARD_MAIN_SESSION_OFF=1" >&2; exit 1; }
 
 input=$(cat)
 agent_id=$(printf '%s' "$input" | jq -r '.agent_id // empty')
@@ -16,8 +17,12 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 [ -n "$cmd" ] || exit 0
 
 # One regex per guarded shape; word-bounded so "pytest.ini" or "go tests/" don't match.
-pattern='(^|[;&|[:space:]])(pytest|py\.test|(python3?|uv run|uvx)[[:space:]]+(-m[[:space:]]+)?pytest|(npm|pnpm|yarn|bun)[[:space:]]+(run[[:space:]]+)?test([[:space:]]|$)|cargo[[:space:]]+test|go[[:space:]]+test|ctest|make[[:space:]]+(test|check)|idf\.py[[:space:]]+(build|size)|cmake[[:space:]]+--build)([[:space:]]|$)'
-if printf '%s' "$cmd" | grep -qE "$pattern"; then
+pattern='(^|[;&|[:space:]])(pytest|py\.test|(python3?|uv run|uvx)[[:space:]]+(-m[[:space:]]+)?pytest|(npm|pnpm|yarn|bun)[[:space:]]+(run[[:space:]]+)?test([[:space:]]|$)|cargo[[:space:]]+(test|build)|go[[:space:]]+test|ctest|ninja|make[[:space:]]+(test|check|all)|cmake[[:space:]]+--build)([[:space:]]|$)'
+# idf.py: drop value-taking options first so "-B build" is not read as the build action.
+opts='-C|-B|-G|-p|-b|-D|--project-dir|--build-dir|--port|--baud|--generator|--define-cache-entry'
+stripped=$(printf '%s' "$cmd" | sed -E "s/(^|[[:space:]])($opts)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:];&|]+)/\1/g")
+idf='idf\.py([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(build|app|bootloader|size|size-components|size-files)([[:space:]]|$)'
+if printf '%s' "$cmd" | grep -qE "$pattern" || printf '%s' "$stripped" | grep -qE "$idf"; then
   jq -n --arg reason "Blocked in the main session: tests, builds and validation runs go to the verifier subagent (Agent tool, subagent_type \"verifier\"), per CLAUDE.md. Subagents may run this command." \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'
 fi

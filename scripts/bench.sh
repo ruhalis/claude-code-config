@@ -126,18 +126,27 @@ sub_json()  { jq -n --arg c "$1" '{agent_id:"abc",agent_type:"verifier",tool_nam
 deny_main() { main_json "$1" | "$GUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
 pass_main() { local o; o=$(main_json "$1" | "$GUARD"); [ -z "$o" ]; }
 pass_sub()  { local o; o=$(sub_json "$1" | "$GUARD"); [ -z "$o" ]; }
-for c in "pytest" "uv run pytest tests/" "python -m pytest -x" "npm test" "pnpm run test" "cargo test" "go test ./..." "ctest" "make test" "idf.py build" "cmake --build build" "cd x && pytest"; do
+for c in "pytest -q" "uv run python -m pytest" "npm test" "cargo test" "go test ./..." "ctest" "make test" "cmake --build build" "cd x && pytest" \
+    "idf.py build" 'idf.py -C "/some dir/x" build' "idf.py -C dir build" "idf.py -p /dev/cu.usbmodem1 build" "idf.py -p X build flash" \
+    "idf.py -C d -B build build" '. "$HOME/esp/esp-idf/export.sh" >/dev/null 2>&1 && idf.py -C "/x y" build' \
+    "idf.py -C d size" "idf.py size-components" "idf.py -C d app" "ninja" "ninja -C build" "make all" "cargo build"; do
     check "main denies: $c" deny_main "$c"
 done
-for c in "cat pytest.ini" "ls go tests/x" "idf.py flash" "idf.py monitor" "git status" "make" "echo npm testing"; do
+for c in 'idf.py -C "/x y" -p "/dev/cu.x" flash' "idf.py -p /dev/cu.x flash" "idf.py -C dir -B build -p port flash" "idf.py --build-dir build flash" \
+    "idf.py --build-dir=build flash" "idf.py -C d monitor" "idf.py set-target esp32s3" "idf.py -C d erase-flash" "idf.py -C d app-flash" \
+    "cat pytest.ini" "ls go tests/x" "cat build/log.txt" "ls build" "git status" "make" "echo npm testing" "echo done"; do
     check "main allows: $c" pass_main "$c"
 done
-for c in "pytest" "idf.py build" "npm test"; do
+for c in "pytest -q" "idf.py -C dir build" "npm test"; do
     check "subagent allows: $c" pass_sub "$c"
 done
 guard_off() { local o; o=$(main_json pytest | GUARD_MAIN_SESSION_OFF=1 "$GUARD"); [ -z "$o" ]; }
 reason_names_verifier() { main_json pytest | "$GUARD" | jq -e '.hookSpecificOutput.permissionDecisionReason|test("verifier")' >/dev/null; }
 check "GUARD_MAIN_SESSION_OFF=1 disables the hook" guard_off
+guard_off_nojq() { local o; o=$(printf '{}' | env PATH=/nonexistent GUARD_MAIN_SESSION_OFF=1 /bin/bash "$GUARD" 2>&1); [ -z "$o" ]; }
+guard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/bash "$GUARD" 2>&1 >/dev/null); rc=$?; [ "$rc" -eq 1 ] && printf '%s' "$e" | grep -q "install jq"; }
+check "GUARD_MAIN_SESSION_OFF=1 works without jq" guard_off_nojq
+check "missing jq fails closed (exit 1 + message)" guard_nojq_fails
 check "deny reason names the verifier" reason_names_verifier
 
 echo "-- instructions and skills"

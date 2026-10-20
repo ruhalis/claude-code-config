@@ -39,13 +39,13 @@ statusline/            submodule (Claude-only)
 | Instructions | `~/.claude/CLAUDE.md` (symlink to `adapters/claude/CLAUDE.md`) |
 | Agents | `~/.claude/agents/*.md` |
 | Skills | `~/.claude/skills/` |
-| Settings | `settings.json` (copy) |
-| Keybindings | `keybindings.json` (copy) |
+| Settings | `settings.json` (merged copy) |
+| Keybindings | `keybindings.json` (merged copy) |
 | Statusline | `statusline/` (submodule) |
 | Hooks | `~/.claude/hooks/guard-main-session.sh` (symlink to `adapters/claude/hooks/`) |
 | Subagent rows | `~/.claude/subagent-statusline.sh` (symlink to `adapters/claude/subagent-statusline.sh`): the agent panel shows `type model effort · task · tokens` per running subagent, wired by `subagentStatusLine` in settings.json |
 
-Symlinked items track repo edits live. The two copies — `settings.json` and `keybindings.json` — are copies precisely because Claude Code rewrites `settings.json` in place when you change the theme or model, and a symlink would push those edits back into the repo. Re-run `install.sh` to update them.
+Symlinked items track repo edits live. The two copies — `settings.json` and `keybindings.json` — are copies precisely because Claude Code rewrites `settings.json` in place when you change the theme or model, and a symlink would push those edits back into the repo. Re-run `install.sh` to update them: it backs up the live file, then merges the repo over it, so the repo wins on every key it declares and the live file keeps the rest, with `model`, `modelSettings`, `effortLevel` and `autoMode` staying as Claude Code last wrote them (the repo only seeds them when absent). A key removed from the repo is not removed from the live file because the merge never deletes, so remove it by hand or with `/config`.
 
 ## Skills and claude.ai
 
@@ -114,7 +114,7 @@ Each `link` line says `new`, `exists` (already that link) or `replace`, so `--dr
 - **verifier** (Sonnet at medium, read-only) — runs every test suite, build, batch and smoke test on the orchestrator's behalf and returns pass/fail with the decisive lines; at milestones, after long unattended work or on high-stakes changes it also checks the integrated result against the acceptance criteria.
 - **Explore** (Haiku at low, read-only) — broad fan-out searches; returns `file:line` locations, overrides the built-in Explore agent.
 
-The rule is enforced, not only stated: `adapters/claude/hooks/guard-main-session.sh` is a `PreToolUse` hook on `Bash` (wired in `settings.json` with `onFailure: block`) that denies `pytest`, `npm test`, `cargo test`, `go test`, `idf.py build`, `cmake --build` and similar in the main session and names the verifier in the denial. Calls from subagents carry `agent_id` in the hook input and pass through. `GUARD_MAIN_SESSION_OFF=1` in settings `env` disables it. `settings.json` also carries a short `permissions.deny` list (force pushes, `git reset --hard`, `git clean -f`, `rm -rf` of `~` or `/`) that applies in every permission mode and to subagents, `subagentPromptCacheTtl: "1h"` so long fan-outs keep their prompt cache, and `maxTurns` on fast-executor (60) and verifier (80) so a runaway run returns partial, resumable output.
+The rule is enforced, not only stated: `adapters/claude/hooks/guard-main-session.sh` is a `PreToolUse` hook on `Bash` (wired in `settings.json` with `onFailure: block`) that denies test and build commands in the main session (`pytest`, `npm test`, `cargo test`/`build`, `go test`, `ctest`, `ninja`, `make test`/`check`/`all`, `cmake --build`, and `idf.py` build-type actions such as `build`, `app`, `bootloader` and `size` whatever options come first, so `idf.py -C "<dir>" build` is caught) and names the verifier in the denial. Flash, monitor and menuconfig stay allowed. Calls from subagents carry `agent_id` in the hook input and pass through. `GUARD_MAIN_SESSION_OFF=1` in settings `env` disables it. Without jq the hook fails closed: it exits 1, so `onFailure: block` stops the call. `settings.json` also carries a short `permissions.deny` list (force pushes in any flag order, `git reset --hard`, `git clean -f`, `rm -rf` of `~` or `/`, and desktop-commander's two terminal tools, which the Bash-only hook can't see) that applies in every permission mode and to subagents, `subagentPromptCacheTtl: "1h"` so long fan-outs keep their prompt cache, and `maxTurns` on fast-executor (60) and verifier (80) so a runaway run returns partial, resumable output.
 
 Delegation is mandatory for validation because the main session's context is the scarce resource: a session that runs its own batches fills up with output and loses the thread of the task, and that costs more than the extra tokens the agents spend. The specialists have no `Skill` tool: esp-idf hands them a restricted prompt block instead, and hardware actions (flashing, resets, motors) stay with the main session.
 

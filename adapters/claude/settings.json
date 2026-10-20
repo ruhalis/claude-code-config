@@ -1,6 +1,8 @@
 {
   "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "CADGEN_TELEMETRY": "0",
+    "CADGEN_UPDATE_CHECK": "0"
   },
   "enableWorkflows": true,
   "statusLine": {
@@ -10,7 +12,8 @@
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
-    "kicad-happy@kicad-happy": true
+    "kicad-happy@kicad-happy": true,
+    "text-to-cad@earthtojake": true
   },
   "extraKnownMarketplaces": {
     "kicad-happy": {
@@ -18,8 +21,16 @@
         "source": "github",
         "repo": "aklofas/kicad-happy"
       }
+    },
+    "earthtojake": {
+      "source": {
+        "source": "github",
+        "repo": "earthtojake/text-to-cad",
+        "ref": "latest"
+      }
     }
   },
+  "syncClaudeAiPlugins": false,
   "advisorModel": "opus",
   "effortLevel": "xhigh",
   "modelSettings": {
@@ -49,6 +60,11 @@
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(git push --force-with-lease *)",
+      "Bash(git *push* --force*)",
+      "Bash(git *push* -f*)",
+      "Bash(git *push* +*)",
+      "mcp__plugin_desktop-commander_desktop-commander__start_process",
+      "mcp__plugin_desktop-commander_desktop-commander__interact_with_process",
       "Bash(git reset --hard *)",
       "Bash(git clean -fd *)",
       "Bash(git clean -fdx *)",
