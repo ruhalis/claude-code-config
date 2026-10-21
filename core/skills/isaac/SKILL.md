@@ -9,7 +9,7 @@ metadata:
 
 # Isaac Sim & Isaac Lab
 
-This skill is for Arlan's robotics work. It targets **Isaac Sim 5.1.0** and **Isaac Lab 2.3.2** (last verified against upstream: 2026-09-22) — the API surface changed significantly from the 4.x / 1.x line and most tutorials on the web are still wrong. Read this whole file before writing any Isaac code.
+This skill is for Arlan's robotics work. It targets **Isaac Sim 5.1.0** and **Isaac Lab 2.3.2** (last verified against upstream: 2026-09-22) — the API surface changed significantly from the 4.x / 1.x line and most tutorials on the web are still wrong.
 
 The pin, venv path, task package, env style and robot facts come from the project's `CLAUDE.md`, `.gitmodules` and `STATUS.md`. Read those first; never guess.
 
@@ -249,7 +249,7 @@ OMNI_KIT_ACCEPT_EULA=YES $LAB/isaaclab.sh -p $LAB/scripts/environments/zero_agen
 OMNI_KIT_ACCEPT_EULA=YES <venv>/bin/python scripts/smoke_env.py --task <id> --num_envs 16 --steps 200 --headless
 ```
 
-## Step 7 — Common traps (read these — they bite every time)
+## Step 7 — Common traps
 
 1. **Imports before SimulationApp / AppLauncher.** Symptom: `ModuleNotFoundError: No module named 'omni'` or `'isaacsim'`. Fix: move the import below the `simulation_app = SimulationApp(...)` line. The only allowed import above it is `SimulationApp` / `AppLauncher` itself.
 
@@ -321,7 +321,7 @@ EOF
 
 ## Files in this skill
 
-- `SKILL.md` — this file. Read in full before writing Isaac code.
+- `SKILL.md` — this file.
 - `templates/standalone_isaac.py` — minimal Isaac Sim standalone boilerplate (5.1).
 - `templates/lab_app_script.py` — Lab AppLauncher script: parse_env_cfg + gym.make, bounded zero-action loop, hard exit (2.3).
 - `templates/direct_rl_env.py`, `templates/manager_based_env.py` — minimal Lab `DirectRLEnv` / `ManagerBasedRLEnv` task skeletons (2.3).

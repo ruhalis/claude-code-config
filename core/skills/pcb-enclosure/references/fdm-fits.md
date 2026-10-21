@@ -1,6 +1,6 @@
 # FDM fit values
 
-STARTING VALUES TO CALIBRATE with one test coupon print. Values are for a 0.4 mm nozzle, PLA or PETG. dfam-check does not cover fits; these do.
+Starting values, to be calibrated with one test coupon print. Values are for a 0.4 mm nozzle, PLA or PETG. dfam-check does not cover fits; these do.
 
 Calibrated on: ______________________ (printer, nozzle, material, date)
 

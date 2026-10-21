@@ -61,5 +61,6 @@ Use `uv` for all Python setup and execution; never bare `pip install`, `python -
 - **CLI tools:** `uvx <tool>` to run once, `uv tool install <tool>` to keep.
 - **Interpreters:** `uv python install <version>`; pin with `uv python pin`.
 - **No `pyproject.toml` and not worth adding one:** `uv venv` then `uv pip install`.
+- **A skill or plugin step that says `pip install`:** run the command it serves with `uv run --with <pkg>` or `uv run --with-requirements <file>` instead of installing into an environment.
 
 Exceptions: toolchains that ship their own Python keep it (ESP-IDF's environment from `install.sh`/`export.sh`, Isaac Sim/Lab's `python.sh`/`isaaclab.sh`, KiCad's bundled Python), a repo already on another tool stays on it unless the user asks to migrate, and the stdlib-only scripts bundled with a skill run with plain `python3`, since they install nothing and create no environment.

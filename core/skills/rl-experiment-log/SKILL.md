@@ -63,7 +63,7 @@ Fill in under the entry's own heading:
 - Next: <the single next change>
 ```
 
-If asked to summarise, produce a table of run-id | changed | key metric | verdict from the log, where key metric is the task metric from Result, then a 3-sentence read of the trend.
+If asked to summarise, produce a table of run-id | changed | key metric | verdict from the log, where key metric is the task metric from Result, then a short read of the trend.
 
 ## Example
 
