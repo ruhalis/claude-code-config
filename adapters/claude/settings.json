@@ -31,6 +31,7 @@
     }
   },
   "syncClaudeAiPlugins": false,
+  "syncClaudeAiSkills": false,
   "advisorModel": "opus",
   "effortLevel": "xhigh",
   "modelSettings": {

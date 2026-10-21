@@ -51,7 +51,7 @@ Symlinked items track repo edits live. The two copies — `settings.json` and `k
 
 `core/skills/` is the only place skills are edited. The installed skill directory holds symlinks to it, so an edit is live the moment it's made. After adding or renaming a skill, `./install.sh skills` relinks just the skills (no settings copy) and names any skill still missing from `~/.claude/skills/`.
 
-The claude.ai copies are separate. claude.ai, Cowork and cloud sessions use the skills uploaded to your claude.ai account; Claude Code downloads those into `~/.claude/skills/synced/` and never uploads, so a local edit does not reach them. After changing a skill, re-upload it:
+The claude.ai copies are separate. claude.ai, Cowork and cloud sessions use the skills uploaded to your claude.ai account; Claude Code can download those into `~/.claude/skills/synced/` but never uploads, so a local edit does not reach them. `settings.json` sets `syncClaudeAiSkills: false`, so Claude Code no longer loads those copies next to the repo skills; that also drops Anthropic's claude.ai skills (docx, pdf, pptx, xlsx, skill-creator and the rest) from Claude Code. After changing a skill, re-upload it for the claude.ai side:
 
 ```bash
 scripts/check-skills.sh                # lint every skill; exit 1 on any FAIL
