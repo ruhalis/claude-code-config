@@ -87,8 +87,8 @@ for f in "$REPO_S" "$LIVE_S"; do
     tag=$([ "$f" = "$REPO_S" ] && echo repo || echo live)
     check "$tag: PreToolUse hook on Bash runs guard-main-session.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-main-session.sh")) | select(.onFailure=="block")' "$f"
-    check "$tag: permissions.deny covers force push, reset --hard, clean -fd, rm -rf /" \
-        jq -e '.permissions.deny as $d | ["Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
+    check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
+        jq -e '.permissions.deny as $d | ["Bash(git commit *)","Bash(git push *)","Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"
     check "$tag: env.CLAUDE_CODE_SUBAGENT_MODEL is sonnet" jq -e '.env.CLAUDE_CODE_SUBAGENT_MODEL=="sonnet"' "$f"
     check "$tag: CLAUDE_CODE_SUBAGENT_MODEL_FORCE is not set (it would override the pins)" \

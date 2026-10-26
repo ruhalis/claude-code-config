@@ -86,7 +86,7 @@ Anything the user will meet again goes where they will meet it: the renderer's h
 
 ### 9. Report
 
-Lead with what the panel does differently now, one line per state that changed, then the evidence: the sheets before and after (sent as files, from `<scratchpad>/baseline` and the last round), the parity line, the build result, the bench URL, whether anything was flashed or committed (say plainly when not). Numbers that changed go in a small table with before and after. Do not restate the procedure.
+Lead with what the panel does differently now, one line per state that changed, then the evidence: the sheets before and after (sent as files, from `<scratchpad>/baseline` and the last round), the parity line, the build result, the bench URL, whether anything was flashed (say plainly when not), the recommended commit (files and message). Numbers that changed go in a small table with before and after. Do not restate the procedure.
 
 ## Reading a sheet
 
@@ -119,6 +119,6 @@ Learned on a 64×64 HUB75 panel with 5-bit levels; they hold for any low-bit-dep
 ## Boundaries
 
 - Never change the base state's look unless the user asked for that state by name.
-- Never flash without an explicit ask in the current message (a request to build, fix or debug is not one); the esp-idf skill's flash rule governs. Never commit unless asked.
+- Never flash without an explicit ask in the current message (a request to build, fix or debug is not one); the esp-idf skill's flash rule governs. Never commit; recommend the files and message instead.
 - Never publish the bench as a new artifact while the existing URL works.
 - Never tune only the C or only the JS, and never widen the parity band to make a change pass.

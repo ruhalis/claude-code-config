@@ -36,7 +36,7 @@ Running outside Claude Code. The installed copy for Claude Code is a symlink to 
 |---|---|
 | `sdkconfig.defaults`, `sdkconfig.defaults.<chip>`, `partitions.csv`, `dependencies.lock`, `*.h.example` | `sdkconfig`, `sdkconfig.old`, `build/`, `managed_components/`, `.cache/` (clangd index), the real secrets header |
 
-Before the first commit in a new project, make sure its `.gitignore` covers the right column; add the lines if it does not. Registry dependencies go through the component manager, never copied sources: `idf.py -C "<dir>" add-dependency "<name>"` (`<dir>` is the project's absolute path, step 0), then commit the changed `idf_component.yml` and `dependencies.lock`. One exception: a manifest with Kconfig-conditional `rules:` dependencies makes the lock file machine-specific, so leave it out then. Credentials live in a gitignored header with a committed `.example` next to it, named by the project.
+Before the first commit in a new project, make sure its `.gitignore` covers the right column; add the lines if it does not. Registry dependencies go through the component manager, never copied sources: `idf.py -C "<dir>" add-dependency "<name>"` (`<dir>` is the project's absolute path, step 0), then recommend committing the changed `idf_component.yml` and `dependencies.lock`. One exception: a manifest with Kconfig-conditional `rules:` dependencies makes the lock file machine-specific, so leave it out then. Credentials live in a gitignored header with a committed `.example` next to it, named by the project.
 
 ## Procedure
 
@@ -104,7 +104,7 @@ A `usbserial-0001` suffix is a generic serial shared by many cheap bridges, so t
 
 - `idf.py -C "<dir>" set-target <chip>` once per fresh checkout. It clears `build/` and generates `sdkconfig` from `sdkconfig.defaults`.
 - No `menuconfig` (step 0): edit `sdkconfig.defaults`, then regenerate. While `build/` exists: `rm -f "<dir>/sdkconfig" && idf.py -C "<dir>" reconfigure`. Without `build/`, `reconfigure` silently falls back to target `esp32`, so run `idf.py -C "<dir>" set-target <chip>` instead. After either, confirm the chip with `grep '^CONFIG_IDF_TARGET=' "<dir>/sdkconfig"`. A single-target project can pin it with `CONFIG_IDF_TARGET="<chip>"` in `sdkconfig.defaults`.
-- Chip-specific keys (flash size, PSRAM) go in `sdkconfig.defaults.<chip>` (`sdkconfig.defaults.esp32s3`), one per chip the project builds for. IDF applies it right after `sdkconfig.defaults`, and only when `sdkconfig.defaults` exists, so keep that file even if it holds only comments. Commit them.
+- Chip-specific keys (flash size, PSRAM) go in `sdkconfig.defaults.<chip>` (`sdkconfig.defaults.esp32s3`), one per chip the project builds for. IDF applies it right after `sdkconfig.defaults`, and only when `sdkconfig.defaults` exists, so keep that file even if it holds only comments. Recommend committing them.
 - A misspelled key is not an error. The configure step only prints `warning: unknown kconfig symbol` and carries on, so grep its output for that line, then confirm the keys that matter landed with a `grep` on the generated `sdkconfig`.
 - Take Kconfig keys from the project's docs, an Espressif example's `sdkconfig.defaults`, or the IDF Kconfig files for that chip. Never invent keys.
 

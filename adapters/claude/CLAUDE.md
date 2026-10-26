@@ -64,3 +64,14 @@ Use `uv` for all Python setup and execution; never bare `pip install`, `python -
 - **A skill or plugin step that says `pip install`:** run the command it serves with `uv run --with <pkg>` or `uv run --with-requirements <file>` instead of installing into an environment.
 
 Exceptions: toolchains that ship their own Python keep it (ESP-IDF's environment from `install.sh`/`export.sh`, Isaac Sim/Lab's `python.sh`/`isaaclab.sh`, KiCad's bundled Python), a repo already on another tool stays on it unless the user asks to migrate, and the stdlib-only scripts bundled with a skill run with plain `python3`, since they install nothing and create no environment.
+
+# Git
+
+This section applies to every agent, subagents included.
+
+Never stage, commit or push, even when the user asks: no `git add`, `git commit` (`--amend` included), `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`. Read-only git (`status`, `diff`, `log`, `show`, `blame`) is fine. When a change is ready, end with a recommendation instead: the files to commit and the message, as commands the user can run with `!`:
+
+    git add <path> <path>
+    git commit -m "<subject>" -m "<body>"
+
+Split unrelated changes into separate commits, leave out generated output, secrets and scratch files, and end the message with the attribution lines Claude Code supplies for commits. This overrides Claude Code's default of committing when asked. Throwaway repos that a script or test creates in a temp directory are exempt.
