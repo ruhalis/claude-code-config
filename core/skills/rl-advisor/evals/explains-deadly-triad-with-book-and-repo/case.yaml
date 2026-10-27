@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: explains-deadly-triad-with-book-and-repo
+expected_outcome: |
+  A short review-ready answer that names the deadly triad (function approximation + bootstrapping +
+  off-policy data) with the Sutton and Barto chapter 11 reference (11.2 Baird / 11.3 deadly triad),
+  explains that the target network slows the bootstrap and is one of the guards, names the other
+  guards present in aquila's SAC transcription (clipped double-Q / min of two critics, polyak 0.995,
+  replay, actor every 2nd step, Adam eps) with the file they live in, and proposes how such a change
+  could be tested as a flag-gated lever with an A/B rather than silently (the fidelity rule). No
+  invented numbers; book sections and repo paths cited.

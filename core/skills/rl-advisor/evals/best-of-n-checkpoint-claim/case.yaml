@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: best-of-n-checkpoint-claim
+expected_outcome: |
+  The answer says no, not yet: picking the best of 20 checkpoints and comparing it to a single final
+  checkpoint is selection bias (the expected maximum of 20 draws is about +1.9 sd above their mean),
+  and 32 episodes give a binomial sd of about 0.06-0.07 on a success rate near 0.8, so the 0.08 gap
+  is inside the noise of one eval. It states what to run: compare like with like (both final, or
+  both best-of-20 picked on one seed and re-evaluated on a held-out seed), at least 2-3 training
+  seeds per arm, more eval episodes, and a CI (bootstrap/IQM) or the compare_arms.py script. It may
+  cite Sutton and Barto's parameter-study practice or Agarwal et al. 2021 / Henderson et al. 2018.
