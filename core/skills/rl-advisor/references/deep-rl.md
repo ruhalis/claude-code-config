@@ -147,7 +147,12 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   (`aquila-map.md` §6). Its instability mode: the on-policy loop oscillates with period 2 (the student
   trained on epoch k's states is different at epoch k+1, so the state distribution flips) — measured
   in aquila EVIDENCE §8.0 (lag-2 autocorrelation > lag-1 on 5 of 7 runs); damping levers are
-  dataset windows across epochs, LR decay, EMA of the student.
+  dataset windows across epochs, LR decay, EMA of the student. The guarantee is also the bound: under
+  DAgger the student's cost is bounded by its imitation loss on its *own* state distribution times the
+  horizon (Ross, Gordon, Bagnell 2011), so where the expert's labels are wrong the bound is on matching
+  wrong labels, and no amount of exposure trains the student toward a regime where the teachers flail.
+  A recurrent student can still *generalise* past memoryless teachers through system identification, but
+  it cannot be *taught* past them (aquila L08/L11, EVIDENCE §3–4; `diagnostics.md` §4).
 - **Policy distillation** (Rusu et al. 2016 ICLR: many teachers → one student, KL on action
   distributions), **GAIL** (Ho & Ermon 2016 NeurIPS: adversarial occupancy matching), **privileged
   teacher–student** (Chen et al. 2019 CoRL "Learning by Cheating"; Lee et al. 2020 Science Robotics

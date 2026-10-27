@@ -67,11 +67,14 @@ below is a section of aquila's `verro/EVIDENCE.md`; "S&B" is Sutton & Barto by c
 
 - **Noise before signal.** No keep/discard from a single seed or a single eval. The eval-to-eval sd of a
   converged aquila teacher is ≈ 24 return on 20 episodes and a DAgger plateau's epoch sd is 6–10; the max of
-  10 such draws sits ≈ +1.5 sd above their mean (EVIDENCE §6.5; `compare_arms.py max-of-n`). The arm-vs-same-
+  10 such draws sits ≈ +1.5 sd above their mean (+1.9 sd for 20; EVIDENCE §6.5; `compare_arms.py max-of-n`). The arm-vs-same-
   arm-new-seed difference (A vs A′) is the floor a lever must clear. Ask for the sd before the effect.
 - **Picking the best is an experiment on the picker.** Argmax over epochs, seeds or checkpoints selects on
   noise (§6.6: the shipped epoch was a +2.4 sd draw). Select on one held-out set and report on another;
   the plateau average (SWA/EMA) is usually worth more than the pick (§7.5).
+- **Test the mechanism, and say what was fed.** A proxy that changes the input (a reshaped reference) does not test
+  the mechanism asked for (a policy that sees the future); a knob fitted on the scored case is a best case on the
+  test, not a result. State what the policy was fed, not only what it was scored against (diagnostics §6).
 - **A student cannot be taught past its labels, though it can generalise past them.** The recurrent student
   beats its memoryless teachers under a rotor fault (517.8 vs 371.4 at 0.3, §4) through system
   identification and general DR, with no fault labels at all. Relabelling in a regime where the teachers
