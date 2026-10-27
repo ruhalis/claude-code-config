@@ -369,7 +369,7 @@ TOOLS=("${UNIQ[@]}")
 printf '%sInstalling from %s%s\n' "$B" "$REPO_DIR" "$RST"
 [ "$DRY_RUN" = 1 ] && printf '%s(dry run — nothing will be written)%s\n' "$YEL" "$RST"
 
-# The only submodule is the Claude statusline.
+# The submodules are the Claude statusline and the upstream anatomy skill.
 case " ${TOOLS[*]} " in
     *" claude "*)
         if [ -f "$REPO_DIR/.gitmodules" ] && [ "$DRY_RUN" = 0 ]; then

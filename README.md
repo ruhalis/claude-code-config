@@ -24,6 +24,7 @@ cd ~/projects/claude-code-config
 core/                  source of truth: agents and skills
   agents/*.md            the specialists, in Claude's format
   skills/*/              SKILL.md skills
+  skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
 adapters/
   claude/                CLAUDE.md + settings.json + keybindings.json + subagent-statusline.sh + hooks/
   vscode/                extensions.txt — extension IDs to install
@@ -60,6 +61,8 @@ scripts/package-skills.sh esp-idf      # -> build/skills/esp-idf.skill
 scripts/skill-sync-status.sh           # after the next sync: in-sync, drifted or not-on-claude.ai
 scripts/bench.sh                       # does the installed setup behave as claimed; --live adds claude -p runs
 ```
+
+`core/skills/anatomy` is the exception: a submodule pinned to an upstream commit (40 MB, needs Node 20.10+ and Chrome), so it is Claude Code only and never packaged or uploaded. Don't edit it in place; update it with `git -C core/skills/anatomy fetch && git -C core/skills/anatomy checkout <commit>`, then commit the new pin.
 
 Never edit files under `synced/`: the next sync replaces them and the repo never sees the change. If `skill-sync-status.sh --diff` shows a claude.ai-side edit worth keeping, make it in `core/skills/` and upload again.
 

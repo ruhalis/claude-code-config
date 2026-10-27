@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Package skills for upload to claude.ai: core/skills/<name> -> build/skills/<name>.skill
 #
-#   scripts/package-skills.sh              every skill
+#   scripts/package-skills.sh              every skill except submodules (anatomy)
 #   scripts/package-skills.sh esp-idf      just these
 #
 # A skill must pass scripts/check-skills.sh first. One that fails is not packaged,
@@ -30,6 +30,7 @@ if [ $# -gt 0 ]; then
 else
     names=()
     for d in "$REPO_DIR"/core/skills/*/; do
+        [ -e "$d/.git" ] && continue  # upstream submodule, Claude Code only
         [ -d "$d" ] && names+=("$(basename "$d")")
     done
 fi
