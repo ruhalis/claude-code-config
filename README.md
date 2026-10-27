@@ -78,10 +78,10 @@ The skills hold workflow and boundaries; project facts live in the project, in `
 | `## Hardware` | kicad-review, pcb-enclosure, robotics-research-brief | `kicad:`, `pins:` (the firmware pin header), `mcu:`, `fab:`, `note:` |
 | `## Print` (optional) | pcb-enclosure | `printer:`, `nozzle:`, `material:`; absent means 0.4 mm nozzle, PLA or PETG |
 | `## Motors` | motor-bench | `rule:`, `rig:`, `program:`, `send:`, `probe:`, `moves:`, `stop:`, `user-only:`, `kill:`, `limits:`, `watchdog:`, `supply:`, `direction:`, `log:` |
-| `## Experiments` | rl-experiment-log | `log:`, `run-id:`, `runs:`, `metric:`, `eval:`, `framework:` |
+| `## Experiments` | rl-experiment-log, rl-advisor | `log:`, `run-id:`, `runs:`, `metric:`, `eval:`, `framework:` (rl-advisor reads `log:`, `metric:` and `eval:` to find what was already tried) |
 | `## Where things run` | robotics-research-brief | robot, GPUs and VRAM, Jetson, simulator versions |
 
-Keep this order, `## Boards` first and short: esp-idf reads a fixed 12 lines after its heading, and motor-bench reads up to the next heading. The sections also connect skills: when firmware changes the header `## Hardware` names as `pins:`, esp-idf hands back to kicad-review's pin diff, and a flash or reset of a board wired to ESCs or drivers follows motor-bench as well as esp-idf. led-animation reads the free-form `CLAUDE.md` section on the renderer and the host tooling's README instead; isaac reads the pin from `CLAUDE.md`, `.gitmodules` and `STATUS.md`.
+Keep this order, `## Boards` first and short: esp-idf reads a fixed 12 lines after its heading, and motor-bench reads up to the next heading. The sections also connect skills: when firmware changes the header `## Hardware` names as `pins:`, esp-idf hands back to kicad-review's pin diff, and a flash or reset of a board wired to ESCs or drivers follows motor-bench as well as esp-idf. led-animation reads the free-form `CLAUDE.md` section on the renderer and the host tooling's README instead; isaac reads the pin from `CLAUDE.md`, `.gitmodules` and `STATUS.md`. rl-advisor answers the RL theory and design questions around a run and hands the run record to rl-experiment-log; its `references/aquila-map.md` is a digest of aquila's `verro/STATUS.md` ledger and `verro/EVIDENCE.md`, so refresh it when those move.
 
 ## VS Code extensions
 

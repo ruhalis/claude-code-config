@@ -1,6 +1,6 @@
 ---
 name: rl-experiment-log
-description: Keeps a lab notebook of RL/IL training runs (e.g. Isaac Lab rsl_rl/skrl PPO, SAC, BC/DAgger distillation) - base run, the one change, config, code commit, exact command and inputs, task metric, verdict, next step. Use whenever the user starts, stops, sweeps or compares training runs, asks what was tried before or which run was best, is about to change a reward term/weight, curriculum, domain randomisation or hyperparameter, or mentions an experiment log, run log, decision ledger, TensorBoard/W&B run or sim-to-real test. Not for writing env code (isaac) or comparing papers (robotics-research-brief).
+description: Keeps a lab notebook of RL/IL training runs (e.g. Isaac Lab rsl_rl/skrl PPO, SAC, BC/DAgger distillation) - base run, the one change, config, code commit, exact command and inputs, task metric, verdict, next step. Use whenever the user starts, stops, sweeps or compares training runs, asks what was tried before or which run was best, is about to change a reward term/weight, curriculum, domain randomisation or hyperparameter, or mentions an experiment log, run log, decision ledger, TensorBoard/W&B run or sim-to-real test. Not for writing env code (isaac), comparing papers (robotics-research-brief) or explaining why a run behaves as it does and what to try (rl-advisor).
 ---
 
 # RL experiment log
