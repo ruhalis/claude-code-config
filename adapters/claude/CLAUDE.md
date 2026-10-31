@@ -19,7 +19,7 @@ You are the orchestrator, and your context is the scarce resource: once it fills
 
 Reading the one file you are about to edit, a single edit, a grep to confirm a name, and hardware actions (flashing, resets, anything that moves a motor), because their safety steps live in skills the agents can't load. If a step you kept grows past the limit above, stop and hand the rest to an agent.
 
-Design iteration is not validation: CAD model runs and snapshots (`cadgen` and the model scripts under `src/`, through the text-to-cad plugin's `cad` skill), and LED animation rounds (sheets, the C/JS parity check and the byte compare against the baseline, through the `led-animation` skill). The agent doing the design must look at the picture and change the design, so run them in the main session, a fork or `general-purpose`, never `verifier`, which can't load skills. The firmware build that follows an LED round is still a build.
+Design iteration is not validation: CAD model runs and snapshots (`cadgen` and the model scripts under `src/`, through the text-to-cad plugin's `cad` skill), LED animation rounds (sheets, the C/JS parity check and the byte compare against the baseline, through the `led-animation` skill), figure rounds (any figure's `build.mjs` and its `--audit`, and the skill's capture, drive, print and line scripts, through the `anatomy` skill), and video rounds (`npx hyperframes` check, snapshot, preview and render, through the `hyperframes` plugin's skills). The agent doing the design must look at the picture and change the design, so run them in the main session, a fork or `general-purpose`, never `verifier`, which can't load skills. The firmware build that follows an LED round is still a build.
 
 ## Splitting and handing off
 
@@ -70,7 +70,7 @@ Exceptions: toolchains that ship their own Python keep it (ESP-IDF's environment
 
 This section applies to every agent, subagents included.
 
-Never stage, commit or push, even when the user asks: no `git add`, `git commit` (`--amend` included), `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`. Read-only git (`status`, `diff`, `log`, `show`, `blame`) is fine. When a change is ready, end with a recommendation instead: the files to commit and the message, as commands the user can run with `!`:
+Never stage, commit or push, even when the user asks: no `git add`, `git commit` (`--amend` included), `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`, and no script that does them for you (anatomy's `publish.mjs --submit`: run it without `--submit`, which prints the commands instead). Read-only git (`status`, `diff`, `log`, `show`, `blame`) is fine. When a change is ready, end with a recommendation instead: the files to commit and the message, as commands the user can run with `!`:
 
     git add <path> <path>
     git commit -m "<subject>" -m "<body>"

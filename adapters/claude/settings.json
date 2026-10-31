@@ -12,6 +12,7 @@
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
+    "hyperframes@hyperframes": true,
     "kicad-happy@kicad-happy": true,
     "text-to-cad@earthtojake": true
   },
@@ -27,6 +28,12 @@
         "source": "github",
         "repo": "earthtojake/text-to-cad",
         "ref": "latest"
+      }
+    },
+    "hyperframes": {
+      "source": {
+        "source": "github",
+        "repo": "heygen-com/hyperframes"
       }
     }
   },
