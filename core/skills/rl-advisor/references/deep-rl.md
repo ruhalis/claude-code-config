@@ -236,8 +236,8 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   was the sub-300 tail, not the mean. Select on one held-out set, report on another (aquila's
   t2i-stratified split), and compare picks only against picks made the same way.
 - **One variable per run**; an A-vs-A′ pair (same arm, new seed) gives the noise floor a lever must
-  clear; pre-register the gate and the kill rule before the run (aquila's PLAN items and A4 gates);
-  a confounded run gets a Confounded line and the verdict judges the bundle (rl-experiment-log).
+  clear; pre-register the gate and the kill rule before the run (aquila's PLAN items, prereg files and A4 gates);
+  a confounded run gets a Confounded line and the verdict judges the bundle (SKILL.md Rules).
 - **Metric**: a task metric independent of the shaped reward (success rate, tracking error, frames
   below a fixed gate), never the training return when reward weights differ between arms.
 

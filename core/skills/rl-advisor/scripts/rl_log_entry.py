@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-fill an rl-experiment-log entry from an Isaac Lab run dir. Read-only.
+"""Pre-fill an Isaac Lab run-log entry (rl-advisor skill, references/isaac-lab-log.md) from an Isaac Lab run dir. Read-only.
 
     rl_log_entry.py <run_dir> [--base <run_dir>] [--host NAME] [--ignore KEY ...]
 
@@ -50,7 +50,7 @@ LINE_LIMIT = 3000  # characters of terms per Reward/Curriculum/DR line
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
         prog="rl_log_entry.py",
-        description="Pre-fill an rl-experiment-log entry from an Isaac Lab run dir's params/*.yaml.",
+        description="Pre-fill an Isaac Lab run-log entry from an Isaac Lab run dir's params/*.yaml.",
         epilog="Run it with a python that has PyYAML, e.g. the Isaac Lab venv's python on the training host: "
         "ssh HOST '<venv>/bin/python - RUN_DIR [--base BASE_DIR]' < rl_log_entry.py. "
         "Exit 1: bad or missing params/*.yaml; 2: usage error; 3: no PyYAML.",

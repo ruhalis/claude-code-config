@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Static checks for Isaac Sim 5.1 / Isaac Lab 2.3 Python code. Read-only, stdlib only (ast + re); runs on
-the Mac, imports nothing from Isaac and writes no bytecode.
+"""Static checks for Isaac Lab 3.0.0 (Isaac Sim 6.2.0.0, Python 3.12) code. Read-only, stdlib only (ast + re);
+runs on the Mac, imports nothing from Isaac and writes no bytecode.
 
     check_isaac_code.py PATH [PATH ...] [--exclude NAME ...]
 
@@ -11,26 +11,52 @@ Isaac Sim link are never ours to fix). build/ and dist/ are scanned: a setuptool
 findings, while skipping by name could hide a real package; add --exclude NAME to skip more. Each file is
 compiled from its bytes exactly as py_compile does (encoding cookie, BOM), in memory, so no __pycache__.
 
-One line per finding, `path:line: RULE message`:
-  ISC000  syntax or compile error (Isaac code is Python 3.11: run this with python3 >= 3.11)
-  ISC001  import of omni.isaac.* (renamed isaacsim.* in Sim 4.5; shims removed in 6.0)
+One line per finding, `path:line: RULE message`. Rules whose message says "removed" or "no longer" fail or
+misbehave on 3.0.0; "deprecated" ones still run on 3.0.0 (DeprecationWarning) but have a removal date.
+  ISC000  syntax or compile error (Isaac Lab 3.0 is Python 3.12: run this with python3 >= 3.12, 3.11 can
+          report 3.12-only syntax as an error)
+  ISC001  import of omni.isaac.* (renamed isaacsim.* in Sim 4.5; the shims are gone in Sim 6)
   ISC002  import of omni.isaac.lab* (renamed isaaclab* in Lab 2.0; no shim)
-  ISC010  omni / isaacsim / isaaclab* / pxr / carb import that runs before AppLauncher(...) or
-          SimulationApp(...). Checked only in files that construct one of them, so env and cfg modules
-          (imported after launch) are exempt. `from isaacsim import SimulationApp` and
-          `from isaaclab.app import AppLauncher` may precede it.
-  ISC020  gym.register(...) entry point (entry_point, or a *_entry_point key in kwargs) that is clearly
-          not a string (a class, function, instance or container), so the env or cfg module is imported
-          with the task package. Computed values (a helper's parameter, os.path.join) are not flagged.
-  ISC021  a module that calls gym.register, or any parent package __init__.py of it, imports Kit at import
-          time, directly or through relative / same-package imports, so the task package cannot be imported
-          before AppLauncher (the wrapper pattern); keep them gymnasium-only with lazy string entry points
-  ISC030  attach_yaw_only (deprecated since Lab 2.1.1): use ray_alignment="yaw"
-  ISC031  effort_limit= / velocity_limit= on ImplicitActuatorCfg: use effort_limit_sim= /
-          velocity_limit_sim= (velocity_limit is ignored there)
-  ISC040  UrdfFileCfg(...) / UrdfConverterCfg(...) without joint_drive= (the default JointDriveCfg leaves
-          gains.stiffness MISSING) or without fix_base= (MISSING); cfg validation fails. Skipped when the
-          call has **kwargs or the file assigns .joint_drive / .fix_base.
+  ISC003  import path removed or moved in Lab 3.0 / Sim 6: omni.physics.tensors.impl, isaaclab.test.benchmark,
+          isaaclab.envs.utils.recording_hooks, SurfaceGripper(Cfg) from isaaclab.assets,
+          isaaclab_physx.physics.SimulationManager, mdp.imu_orientation / imu_projected_gravity,
+          TimestampedBufferWarp
+  ISC010  omni / carb / isaacsim import (or one of the few Lab modules that import them at import time, e.g.
+          the envs.ui windows, keyboard/gamepad devices, PhysxManager) that runs before AppLauncher(...),
+          SimulationApp(...) or launch_simulation(...). Plain `isaaclab.*` and `pxr` imports are fine before
+          launch in 3.0 (kit-less configs start no Kit at all). Checked only in files that start a launcher,
+          so env and cfg modules (imported before or after launch) are exempt.
+  ISC011  AppLauncher: deprecated shim in 3.0 that forces Kit even for kit-less configs; use
+          add_launcher_args(parser) and `with launch_simulation(cfg, args_cli):` from isaaclab.app
+  ISC012  --headless / --enable_cameras / --cpu in a command string or argv list: the launcher parser rejects
+          them in 3.0 (headless is the default; --viz selects a visualizer; --device cpu)
+  ISC013  scripts/reinforcement_learning/<library>/train.py or play.py: removed, use
+          `isaaclab train|play --rl_library <library>` (or scripts/reinforcement_learning/train.py)
+  ISC021  a module that calls gym.register, or any parent package __init__.py of it, imports Kit (omni, carb,
+          isaacsim, or a Kit-bound Lab module) at import time, directly or through relative / same-package
+          imports, so the task package cannot be imported before launch_simulation (the RL entrypoints
+          import isaaclab_tasks first); keep them gymnasium-only with lazy string entry points
+  ISC030  attach_yaw_only removed from RayCasterCfg: use ray_alignment="yaw" (or "base"; "world" is new)
+  ISC031  deprecated actuator limit fields (removed in 3.1): effort_limit_sim / velocity_limit_sim ->
+          joint_effort_limit / joint_velocity_limit; effort_limit / velocity_limit -> actuator_* (explicit
+          actuators) or joint_* (ImplicitActuatorCfg)
+  ISC032  gravity_bias= on ImuCfg / PvaCfg: removed (Pva has no gravity, the new Imu always includes it)
+  ISC040  UrdfFileCfg(...) / UrdfConverterCfg(...) without fix_base= (still MISSING; cfg validation fails).
+          Skipped when the call has **kwargs or the file assigns .fix_base. joint_drive is optional now.
+  ISC050  Isaac Sim module paths deprecated in Sim 6.0 that Lab 3.0's Kit experiences no longer preload
+          (isaacsim.core.utils.stage/prims/..., isaacsim.core.prims, isaacsim.core.simulation_manager,
+          isaacsim.core.cloner, isaacsim.core.api, isaacsim.sensors.*, ...): use the Lab replacement
+  ISC060  write_<root|joint|body|object>_*_to_sim( without _index / _mask: deprecated, use
+          write_*_to_sim_index(..., env_ids=) or write_*_to_sim_mask(..., env_mask=)
+  ISC061  deprecated asset API: root_physx_view (root_view), set_joint_{position,velocity,effort}_target
+          (actuators.target_command.set_*_index), data.joint_{pos,vel,effort}_target / computed_torque /
+          applied_torque (actuators.*), RigidObjectCollection object_* names (body_*), XformPrimView
+          (FrameView)
+  ISC062  removed asset data: data.gear_ratio, data.body_incoming_joint_wrench_b (use JointWrenchSensorCfg)
+  ISC070  rot=(1.0, 0.0, 0.0, 0.0): the wxyz identity, but 3.0 quaternions are xyzw so this is a 180 degree
+          rotation about x; the identity is (0.0, 0.0, 0.0, 1.0). Heuristic: only exact literals in `rot`.
+  ISC071  deprecated viewport config: ViewerCfg / env_cfg.viewer.eye|lookat|... (use
+          sim.default_visualizer_cfg = VisualizerCfg(eye=, lookat=)), ViewportCameraController
 
 Only literal usage is matched: aliases (IA = ImplicitActuatorCfg), values passed through **kwargs, .replace(),
 attribute assignment after construction (except the cases noted above) and importlib / __import__ are not seen.
@@ -39,7 +65,6 @@ Exit 0: no findings. 1: at least one finding. 2: usage error (bad option, missin
 """
 import argparse
 import ast
-import builtins
 import io
 import os
 import re
@@ -51,43 +76,62 @@ SKIP_DIRS = {
     ".git", "__pycache__", "node_modules", "site-packages", ".tox", ".nox", ".mypy_cache", ".pytest_cache",
     ".eggs", "third_party", "_isaac_sim",
 }
-LAUNCHERS = {"AppLauncher", "SimulationApp"}
-KIT_ROOTS = {"omni", "isaacsim", "pxr", "carb"}
-NON_STR_BUILTINS = {"dict", "list", "set", "tuple", "int", "float", "bool", "object", "type", "frozenset", "bytes",
-                    "bytearray", "complex", "range", "slice", "property", "staticmethod", "classmethod"}
-BUILTIN_NAMES = {n for n in dir(builtins) if not n.startswith("_")} - {"str", "format", "repr", "ascii", "chr"}
+LAUNCHERS = {"AppLauncher", "SimulationApp", "launch_simulation"}
+KIT_ROOTS = {"omni", "isaacsim", "carb"}
+# pxr is not Kit-bound in Lab 3.0: usd-exchange ships it (pyproject.toml) and isaaclab.sim imports it, which tutorials do
+# before launch_simulation. Lab modules that import omni / carb / isaacsim unconditionally at import time (module level,
+# outside TYPE_CHECKING); everything else under isaaclab* imports without Kit.
+LAB_KIT_MODULES = (
+    "isaaclab.envs.ui.base_env_window", "isaaclab.envs.ui.empty_window", "isaaclab.envs.ui.manager_based_rl_env_window",
+    "isaaclab.ui.widgets.image_plot", "isaaclab.ui.widgets.line_plot", "isaaclab.ui.widgets.ui_widget_wrapper",
+    "isaaclab.ui.xr_widgets.instruction_widget", "isaaclab.sim.converters.mesh_converter",
+    "isaaclab.devices.keyboard.se2_keyboard", "isaaclab.devices.keyboard.se3_keyboard",
+    "isaaclab.devices.gamepad.se2_gamepad", "isaaclab.devices.gamepad.se3_gamepad",
+    "isaaclab_physx.physics.physx_manager", "isaaclab_physx.app.kit_stage", "isaaclab_physx.cloner.replicate",
+)
+_DEVICES = {"Se2Keyboard", "Se3Keyboard", "Se2Gamepad", "Se3Gamepad"}
+LAB_KIT_NAMES = {  # lazily exported names whose defining module is in LAB_KIT_MODULES
+    "isaaclab.envs.ui": {"BaseEnvWindow", "EmptyWindow", "ManagerBasedRLEnvWindow"},
+    "isaaclab.ui.widgets": {"ImagePlot", "LiveLinePlot"},
+    "isaaclab.sim.converters": {"MeshConverter"},
+    "isaaclab.devices": _DEVICES, "isaaclab.devices.keyboard": _DEVICES, "isaaclab.devices.gamepad": _DEVICES,
+    "isaaclab_physx.physics": {"PhysxManager", "IsaacEvents"},
+}
 IGNORE_RE = re.compile(r"#\s*isaac-check:\s*ignore\b")
 # fallback for files that do not parse
 OLD_IMPORT_RE = re.compile(r"^\s*(?:from|import)\s+(omni\.isaac\b[\w.]*)", re.M)
 
 
 # ------------------------------------------------------------------ helpers
-def is_kit(module):
-    root = module.split(".")[0]
-    return root in KIT_ROOTS or root.startswith("isaaclab")
+def is_kit_module(module):
+    """True for a module that needs a running Kit app to import (omni, carb, isaacsim, or a Kit-bound Lab module)."""
+    if module.split(".")[0] in KIT_ROOTS:
+        return True
+    return any(module == m or module.startswith(m + ".") for m in LAB_KIT_MODULES)
 
 
 def pre_launch_ok(node):
-    """Imports allowed above the launcher: the launcher classes themselves (no Kit needed)."""
+    """Imports allowed above the launcher: the isaacsim launcher class itself (no Kit needed)."""
     if isinstance(node, ast.Import):
-        return all(a.name in ("isaacsim", "isaacsim.simulation_app", "isaaclab", "isaaclab.app") for a in node.names)
+        return all(a.name in ("isaacsim", "isaacsim.simulation_app") for a in node.names)
     mod = node.module or ""
     names = {a.name for a in node.names}
-    if mod in ("isaacsim.simulation_app", "isaaclab.app"):
+    if mod == "isaacsim.simulation_app":
         return True
     if mod == "isaacsim":
         return names <= {"SimulationApp", "AppFramework"}
-    if mod == "isaaclab":
-        return names <= {"app"}
     return False
 
 
 def kit_modules(node):
-    """Absolute Kit modules an Import/ImportFrom node brings in (empty for relative imports)."""
+    """Absolute Kit-bound modules an Import/ImportFrom node brings in (empty for relative imports)."""
     if isinstance(node, ast.Import):
-        return [a.name for a in node.names if is_kit(a.name)]
-    if node.level == 0 and node.module and is_kit(node.module):
-        return [node.module]
+        return [a.name for a in node.names if is_kit_module(a.name)]
+    if node.level == 0 and node.module:
+        if is_kit_module(node.module):
+            return [node.module]
+        return ["{}.{}".format(node.module, a.name) for a in node.names
+                if is_kit_module("{}.{}".format(node.module, a.name)) or a.name in LAB_KIT_NAMES.get(node.module, ())]
     return []
 
 
@@ -97,10 +141,6 @@ def final_name(func):
     if isinstance(func, ast.Attribute):
         return func.attr
     return None
-
-
-def is_capwords(name):
-    return bool(name) and name[:1].isupper() and not name.isupper()
 
 
 def import_text(node):
@@ -198,8 +238,8 @@ def load(path):
         result = (Parsed(path, decode(data), tree), None)
     except SyntaxError as exc:
         msg = exc.msg
-        if sys.version_info < (3, 11):
-            msg += "; parsed with Python {}.{}, Isaac code is 3.11: use python3 >= 3.11".format(*sys.version_info[:2])
+        if sys.version_info < (3, 12):
+            msg += "; parsed with Python {}.{}, Isaac Lab 3.0 code is 3.12: use python3 >= 3.12".format(*sys.version_info[:2])
         result = (None, (exc.lineno or 1, msg))
     except (OSError, ValueError) as exc:
         result = (None, (1, str(exc)))
@@ -341,83 +381,146 @@ def gym_register_calls(p):
     return out
 
 
-class ModuleNames:
-    """What module-level names are bound to: strings, objects (imports, def, class), or other assignments."""
+# ------------------------------------------------------------------ rule tables
+MOVED_MODULES = (
+    ("omni.physics.tensors.impl", "omni.physics.tensors.api (same classes, only the module path moved)"),
+    ("isaaclab.test.benchmark", "isaaclab.benchmark"),
+    ("isaaclab.envs.utils.recording_hooks", "removed; register physics-backend hooks with "
+     "SimulationContext.add_render_callback() and record with env_cfg.video_recorders = [VideoRecorderCfg(...)]"),
+    ("isaaclab.assets.surface_gripper", "isaaclab_physx.assets (SurfaceGripper moved to the PhysX package)"),
+)
+MOVED_NAMES = {
+    ("isaaclab.assets", "SurfaceGripper"): "from isaaclab_physx.assets import SurfaceGripper",
+    ("isaaclab.assets", "SurfaceGripperCfg"): "from isaaclab_physx.assets import SurfaceGripperCfg",
+    ("isaaclab_physx.physics", "SimulationManager"): "isaaclab_physx.physics.PhysxManager (import it `as SimulationManager` "
+    "to keep call sites backend-agnostic)",
+    ("isaaclab.envs.mdp", "imu_orientation"): "pva_orientation (the old full-state Imu is now Pva)",
+    ("isaaclab.envs.mdp", "imu_projected_gravity"): "pva_projected_gravity (the old full-state Imu is now Pva)",
+    ("isaaclab.utils.buffers", "TimestampedBufferWarp"): "TimestampedBuffer(wp.zeros(...))",
+}
+MOVED_ATTRS = {"imu_orientation": "pva_orientation", "imu_projected_gravity": "pva_projected_gravity"}
 
-    def __init__(self, tree):
-        self.strings, self.objects, self.assigned = set(), set(), {}
-        for node in tree.body:
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                for a in node.names:
-                    self.objects.add(a.asname or a.name.split(".")[0])
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                self.objects.add(node.name)
-            elif isinstance(node, ast.Assign):
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        self.assigned[t.id] = node.value
-        for name, value in self.assigned.items():
-            if is_stringish(value, set()):
-                self.strings.add(name)
+# Isaac Sim 6.0 deprecations from docs/source/isaaclab/migrating.rst ("Python module renames"), longest prefix first.
+SIM_DEPRECATED = (
+    ("isaacsim.core.utils.extensions", "isaaclab.sim.utils.enable_extension"),
+    ("isaacsim.core.utils.stage", "isaaclab.sim.utils.stage"),
+    ("isaacsim.core.utils.prims", "isaaclab.sim.utils.prims"),
+    ("isaacsim.core.utils.queries", "isaaclab.sim.utils.queries"),
+    ("isaacsim.core.utils.transforms", "isaaclab.sim.utils.transforms"),
+    ("isaacsim.core.utils.semantics", "isaaclab.sim.utils.semantics"),
+    ("isaacsim.core.utils.viewports", "isaacsim.core.rendering_manager.ViewportManager"),
+    ("isaacsim.core.prims", "isaaclab.sim.views.FrameView (or isaacsim.core.experimental.prims)"),
+    ("isaacsim.core.simulation_manager",
+     "isaaclab_physx.physics.PhysxManager or isaaclab_newton.physics.NewtonManager"),
+    ("isaacsim.core.cloner", "isaaclab.cloner"),
+    ("isaacsim.core.api", "isaaclab.sim / isaacsim.core.experimental.* (Lab 3.0 no longer depends on isaacsim.core.api)"),
+    ("isaacsim.replicator.mobility_gen", "isaacsim.replicator.experimental.mobility_gen"),
+)
+
+DEPRECATED_ATTRS = {  # any attribute access or call
+    "root_physx_view": "root_view (backend-specific view)",
+    "set_joint_position_target": "actuators.target_command.set_position_index(value=, joint_ids=)",
+    "set_joint_velocity_target": "actuators.target_command.set_velocity_index(value=, joint_ids=)",
+    "set_joint_effort_target": "actuators.target_command.set_effort_index(value=, joint_ids=)",
+    "find_objects": "find_bodies",
+}
+DEPRECATED_DATA = {  # only on a `.data` receiver
+    "joint_pos_target": "actuators.target_command.position",
+    "joint_vel_target": "actuators.target_command.velocity",
+    "joint_effort_target": "actuators.target_command.effort",
+    "computed_torque": "actuators.computed_effort",
+    "applied_torque": "actuators.applied_effort",
+}
+REMOVED_DATA = {  # only on a `.data` receiver
+    "gear_ratio": "removed; read the gear ratio from your actuator configuration",
+    "body_incoming_joint_wrench_b": "removed; add a JointWrenchSensorCfg to the scene and read "
+    "sensor.data.force.torch / .torque.torch",
+}
+OBJECT_DATA_RE = re.compile(r"^(default_object_state|object_names|object_(?:link_|com_)?(?:state|pose|pos|quat|vel|"
+                            r"lin_vel|ang_vel|acc|lin_acc|ang_acc)_[wb])$")
+WRITE_RE = re.compile(r"^write_(?:root|joint|body|object)_\w+_to_sim$")
+VIEWER_FIELDS = {"eye", "lookat", "cam_prim_path", "resolution", "origin_type", "env_index", "asset_name", "body_name"}
+ACTUATOR_LIMITS = {
+    "effort_limit_sim": "joint_effort_limit", "velocity_limit_sim": "joint_velocity_limit",
+}
+ACTUATOR_CFGS = {"ActuatorBaseCfg", "DCMotorCfg", "DelayedPDActuatorCfg", "IdealPDActuatorCfg", "ImplicitActuatorCfg",
+                 "RemotizedPDActuatorCfg", "ActuatorNetLSTMCfg", "ActuatorNetMLPCfg"}
+REMOVED_FLAGS_RE = re.compile(r"(?<!\S)(--headless|--enable_cameras|--cpu)(?![\w-])")
+COMMAND_MARKERS = ("isaaclab", ".py", "python", "uv run")
+PER_LIB_SCRIPT_RE = re.compile(r"reinforcement_learning/(rsl_rl|rl_games|skrl|sb3|rlinf)/(train|play)\.py")
 
 
-def is_stringish(node, str_names):
-    if isinstance(node, ast.Constant):
-        return isinstance(node.value, str)
-    if isinstance(node, ast.JoinedStr):
-        return True
-    if isinstance(node, ast.Name):
-        return node.id in str_names
-    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
-        return is_stringish(node.left, str_names) or is_stringish(node.right, str_names)
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
-        return is_stringish(node.func.value, str_names)
-    return False
+def write_replacement(name):
+    """3.0 replacement text for a deprecated write_*_to_sim name."""
+    if name.endswith("_state_to_sim") and name != "write_joint_state_to_sim":
+        return ("the pose and velocity writers, e.g. write_root_link_pose_to_sim_index(root_pose=, env_ids=) and "
+                "write_root_com_velocity_to_sim_index(root_velocity=, env_ids=)")
+    if name == "write_joint_state_to_sim":
+        return "write_joint_state_to_sim_index(position=, velocity=, env_ids=)"
+    new = {"write_joint_limits_to_sim": "write_joint_position_limit_to_sim",
+           "write_joint_friction_to_sim": "write_joint_friction_coefficient_to_sim",
+           "write_object_velocity_to_sim": "write_body_com_velocity_to_sim"}.get(name, name)
+    new = new.replace("_object_", "_body_")
+    return "{0}_index(..., env_ids=) or {0}_mask(..., env_mask=)".format(new)
 
 
-def clearly_not_string(node, names, depth=0):
-    """True only for values that cannot be an "module:attr" string. Unknown computed values are False."""
-    if depth > 5 or is_stringish(node, names.strings):
+def sim_replacement(module):
+    """Replacement for a deprecated Isaac Sim module path, else None."""
+    for prefix, repl in SIM_DEPRECATED:
+        if module == prefix or module.startswith(prefix + "."):
+            return repl
+    parts = module.split(".")
+    if len(parts) >= 3 and parts[:2] == ["isaacsim", "sensors"] and parts[2] != "experimental":
+        return "isaacsim.sensors.experimental." + parts[2]
+    if module.startswith("isaacsim.robot.wheeled_robots") and not module.startswith("isaacsim.robot.wheeled_robots.nodes"):
+        return "isaacsim.robot.experimental.wheeled_robots"
+    return None
+
+
+def on_data(node):
+    """True for `<x>.data.<attr>` or `data.<attr>` receivers (node is the Attribute)."""
+    v = node.value
+    return (isinstance(v, ast.Attribute) and v.attr == "data") or (isinstance(v, ast.Name) and v.id == "data")
+
+
+def is_wxyz_identity(node):
+    if not isinstance(node, (ast.Tuple, ast.List)) or len(node.elts) != 4:
         return False
-    if isinstance(node, ast.Constant):
-        return True  # a non-str constant (None, a number)
-    if isinstance(node, (ast.Dict, ast.List, ast.Tuple, ast.Set, ast.Lambda, ast.ListComp, ast.DictComp,
-                         ast.SetComp, ast.GeneratorExp)):
-        return True
-    if isinstance(node, ast.Name):
-        if node.id in names.objects:
+    vals = []
+    for e in node.elts:
+        if isinstance(e, ast.UnaryOp) and isinstance(e.op, (ast.USub, ast.UAdd)):
+            e = e.operand
+        if not (isinstance(e, ast.Constant) and isinstance(e.value, (int, float)) and not isinstance(e.value, bool)):
+            return False
+        vals.append(abs(e.value))
+    return vals == [1, 0, 0, 0]
+
+
+def is_actuator_cfg(name):
+    return name in ACTUATOR_CFGS or bool(name and name.endswith("ActuatorCfg"))
+
+
+def string_nodes(p):
+    """(Constant str node, is_first_add_argument_arg) for every string that is not a docstring or a help= text."""
+    skip = set()
+    for n in ast.walk(p.tree):
+        if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant):
+            skip.add(id(n.value))  # docstrings and bare string statements
+        elif isinstance(n, ast.keyword) and n.arg in ("help", "description", "epilog"):
+            skip.add(id(n.value))
+        elif isinstance(n, ast.Call) and final_name(n.func) == "add_argument":
+            skip.update(id(a) for a in n.args)  # the flag names a script defines for itself
+    for n in ast.walk(p.tree):
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in skip:
+            yield n
+
+
+def has_isaac_context(p):
+    for n in p.imports():
+        mods = [a.name for a in n.names] if isinstance(n, ast.Import) else [n.module or ""]
+        if any(m.split(".")[0].startswith(("isaaclab", "isaacsim", "omni")) for m in mods):
             return True
-        if node.id in names.assigned:
-            return clearly_not_string(names.assigned[node.id], names, depth + 1)
-        return node.id in BUILTIN_NAMES
-    if isinstance(node, ast.Attribute):
-        return is_capwords(node.attr)  # module.MyEnvCfg
-    if isinstance(node, ast.Call):
-        callee = final_name(node.func)
-        return is_capwords(callee) or (isinstance(node.func, ast.Name) and callee in NON_STR_BUILTINS)
     return False
-
-
-def entry_point_values(call, names):
-    """(name, value node) for entry_point (keyword or 2nd positional), *_entry_point keywords and kwargs keys."""
-    out = []
-    if len(call.args) > 1:
-        out.append(("entry_point", call.args[1]))
-    for kw in call.keywords:
-        if kw.arg and kw.arg.endswith("entry_point"):
-            out.append((kw.arg, kw.value))
-        if kw.arg != "kwargs":
-            continue
-        value = kw.value
-        if isinstance(value, ast.Name) and isinstance(names.assigned.get(value.id), (ast.Dict, ast.Call)):
-            value = names.assigned[value.id]
-        if isinstance(value, ast.Dict):
-            for key, val in zip(value.keys, value.values):
-                if isinstance(key, ast.Constant) and str(key.value).endswith("entry_point"):
-                    out.append((key.value, val))
-        elif isinstance(value, ast.Call) and final_name(value.func) == "dict":
-            out += [(k.arg, k.value) for k in value.keywords if k.arg and k.arg.endswith("entry_point")]
-    return out
 
 
 def check_file(path):
@@ -441,25 +544,52 @@ def check_file(path):
         return out
     p = parsed
 
-    # ISC001 / ISC002: pre-rename namespaces
+    # ISC001 / ISC002 / ISC003 / ISC050 / ISC061 / ISC071: import paths
     for node in p.imports():
         if isinstance(node, ast.Import):
-            mods = [a.name for a in node.names]
-        elif node.level == 0 and node.module in ("omni", "omni.isaac"):
-            mods = ["{}.{}".format(node.module, a.name) for a in node.names]  # from omni.isaac import lab
+            primary = [a.name for a in node.names]
+            secondary = []
+            names = []
         elif node.level == 0 and node.module:
-            mods = [node.module]
+            names = [(node.module, a.name) for a in node.names]
+            if node.module in ("omni", "omni.isaac"):
+                primary, secondary = ["{}.{}".format(node.module, a.name) for a in node.names], []  # from omni.isaac import lab
+            else:
+                primary, secondary = [node.module], ["{}.{}".format(node.module, a.name) for a in node.names]
         else:
-            mods = []
-        for mod in mods:
+            primary, secondary, names = [], [], []
+        for mod in primary:
             if mod == "omni.isaac.lab" or mod.startswith(("omni.isaac.lab.", "omni.isaac.lab_")):
                 new = "isaaclab" + mod[len("omni.isaac.lab"):]
                 findings.append((node.lineno, "ISC002", "{}: Lab 2.x name is {} (no shim)".format(mod, new)))
             elif mod == "omni.isaac" or mod.startswith("omni.isaac."):
                 findings.append((node.lineno, "ISC001",
-                                 "{}: pre-4.5 name, use isaacsim.* (reference/import-migration.md)".format(mod)))
+                                 "{}: pre-4.5 name, use isaacsim.* (the omni.isaac shims are gone in Sim 6; many "
+                                 "isaacsim.core.* paths are deprecated too, see ISC050)".format(mod)))
+        for mod in primary + secondary:
+            hit = None
+            for prefix, repl in MOVED_MODULES:
+                if mod == prefix or mod.startswith(prefix + "."):
+                    hit = (prefix, repl)
+                    break
+            if hit and (mod in primary or not any(m == hit[0] or m.startswith(hit[0] + ".") for m in primary)):
+                findings.append((node.lineno, "ISC003", "{}: removed or moved in Lab 3.0, use {}".format(*hit)))
+            repl = sim_replacement(mod)
+            if repl and (mod in primary or not any(sim_replacement(m) for m in primary)):
+                findings.append((node.lineno, "ISC050", "{}: deprecated in Isaac Sim 6.0 and not preloaded by Lab 3.0's "
+                                 "Kit experiences; use {} (call isaaclab.sim.utils.enable_extension(...) after launch "
+                                 "before importing an isaacsim.* replacement)".format(mod, repl)))
+        for key in names:
+            if key in MOVED_NAMES:
+                findings.append((node.lineno, "ISC003", "{}.{}: removed or moved in Lab 3.0, use {}".format(
+                    key[0], key[1], MOVED_NAMES[key])))
+            if key[1] == "XformPrimView":
+                findings.append((node.lineno, "ISC061", "XformPrimView: deprecated alias, use FrameView"))
+            if key[1] in ("ViewerCfg", "ViewportCameraController") and key[0].startswith("isaaclab"):
+                findings.append((node.lineno, "ISC071", "{} is deprecated: set sim.default_visualizer_cfg = "
+                                 "VisualizerCfg(eye=, lookat=) instead".format(key[1])))
 
-    # ISC010: Kit imports above the launcher
+    # ISC010 / ISC011: launcher order and the deprecated AppLauncher
     launches = [c for c in p.calls() if final_name(c.func) in LAUNCHERS]
     if launches:
         module_level = [c for c in launches if p.scope(c) is None]
@@ -477,18 +607,42 @@ def check_file(path):
                     scope is first_scope and node.lineno < first.lineno
                 )
             if early:
-                findings.append((node.lineno, "ISC010", "`{}` runs before {}(...) at line {}: move it below the launcher"
-                                 .format(import_text(node), what, first.lineno)))
+                findings.append((node.lineno, "ISC010", "`{}` needs a running Kit app but runs before {}(...) at line {}: "
+                                 "move it below the launcher".format(import_text(node), what, first.lineno)))
+    for node in ast.walk(p.tree):
+        if isinstance(node, ast.Call) and final_name(node.func) == "AppLauncher" and isinstance(
+                node.func, (ast.Name, ast.Attribute)):
+            findings.append((node.lineno, "ISC011", "AppLauncher is a deprecated shim that always starts Kit; use "
+                             "`from isaaclab.app import add_launcher_args, launch_simulation`, add_launcher_args(parser) "
+                             "and `with launch_simulation(env_cfg, args_cli):` (starts only the runtime the cfg needs)"))
+        elif isinstance(node, ast.Attribute) and node.attr == "add_app_launcher_args":
+            findings.append((node.lineno, "ISC011", "AppLauncher.add_app_launcher_args is deprecated: use "
+                             "isaaclab.app.add_launcher_args(parser)"))
 
-    # ISC020 / ISC021: registration and the packages above it must stay lazy
+    # ISC012 / ISC013: command strings
+    for node in string_nodes(p):
+        text = node.value
+        m = REMOVED_FLAGS_RE.search(text)
+        if m:
+            # an argv element on its own (in a file that uses Isaac), or a flag inside a command line; prose and log
+            # messages that merely mention a flag are not commands
+            if text.strip() == m.group(1):
+                flagged = m.group(1) != "--cpu" and has_isaac_context(p)
+            else:
+                flagged = any(marker in text for marker in COMMAND_MARKERS)
+            if flagged:
+                findings.append((node.lineno, "ISC012", "{}: rejected by the 3.0 launcher parser (headless is the default; "
+                                 "--viz kit|newton_gl|... selects a visualizer, --device cpu selects the device, cameras "
+                                 "are enabled automatically)".format(m.group(1))))
+        m = PER_LIB_SCRIPT_RE.search(text)
+        if m:
+            findings.append((node.lineno, "ISC013", "scripts/reinforcement_learning/{0}/{1}.py was removed: use "
+                             "`isaaclab {1} --rl_library {0} --task ...` (or "
+                             "scripts/reinforcement_learning/{1}.py --rl_library {0})".format(m.group(1), m.group(2))))
+
+    # ISC021: registration and the packages above it must stay Kit-free
     registers = gym_register_calls(p)
     if registers:
-        names = ModuleNames(p.tree)
-        for call in registers:
-            for name, value in entry_point_values(call, names):
-                if clearly_not_string(value, names):
-                    findings.append((value.lineno, "ISC020", '{} is not a string: use "<module>:<Class>" '
-                                     '(f"{{__name__}}.my_env:MyEnv") or "<pkg>:<file>.yaml"'.format(name)))
         chain = kit_chain(path)
         if chain:
             findings.append(chain_finding(chain, "registration module"))
@@ -497,34 +651,97 @@ def check_file(path):
             if chain:
                 out.setdefault(init, []).append(chain_finding(chain, "parent package of a task registration"))
 
-    # ISC030 / ISC031 / ISC040: cfg fields
-    assigned = set()  # attribute names assigned anywhere (cfg.joint_drive = ...)
+    # cfg fields and calls
+    assigned = set()  # attribute names assigned anywhere (cfg.fix_base = ...)
     for n in ast.walk(p.tree):
         if isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            value = n.value
             for t in n.targets if isinstance(n, ast.Assign) else [n.target]:
                 if isinstance(t, ast.Attribute):
                     assigned.add(t.attr)
                     if t.attr == "attach_yaw_only":
-                        findings.append((n.lineno, "ISC030", 'attach_yaw_only is deprecated: use ray_alignment="yaw"'))
+                        findings.append((n.lineno, "ISC030", _yaw_message(value)))
+                    if t.attr == "rot" and value is not None and is_wxyz_identity(value):
+                        findings.append((value.lineno, "ISC070", _quat_message()))
     for call in p.calls():
         name = final_name(call.func)
         kws = {kw.arg for kw in call.keywords}
         for kw in call.keywords:
             if kw.arg == "attach_yaw_only":
-                findings.append((kw.value.lineno, "ISC030", 'attach_yaw_only is deprecated: use ray_alignment="yaw"'))
-        if name == "ImplicitActuatorCfg":
+                findings.append((kw.value.lineno, "ISC030", _yaw_message(kw.value)))
+            if kw.arg == "rot" and is_wxyz_identity(kw.value):
+                findings.append((kw.value.lineno, "ISC070", _quat_message()))
+        if is_actuator_cfg(name):
+            implicit = name == "ImplicitActuatorCfg"
             for kw in call.keywords:
-                if kw.arg in ("effort_limit", "velocity_limit"):
-                    note = " (velocity_limit is ignored by implicit actuators)" if kw.arg == "velocity_limit" else ""
-                    findings.append((kw.value.lineno, "ISC031",
-                                     "{}= on ImplicitActuatorCfg: use {}_sim={}".format(kw.arg, kw.arg, note)))
+                if kw.arg in ACTUATOR_LIMITS:
+                    new = ACTUATOR_LIMITS[kw.arg]
+                elif kw.arg in ("effort_limit", "velocity_limit"):
+                    new = ("joint_" if implicit else "actuator_") + kw.arg
+                    if not implicit:
+                        new += " (rated actuator-model limit; joint_{} requests a solver clamp)".format(kw.arg)
+                else:
+                    continue
+                findings.append((kw.value.lineno, "ISC031", "{}= on {} is deprecated (removed in 3.1): use {}=".format(
+                    kw.arg, name, new)))
+        if name in ("ImuCfg", "PvaCfg") and "gravity_bias" in kws:
+            kw = next(k for k in call.keywords if k.arg == "gravity_bias")
+            findings.append((kw.value.lineno, "ISC032", "gravity_bias= was removed from {}: Pva reports kinematic "
+                             "acceleration without gravity, the new Imu always includes gravity".format(name)))
         if name in ("UrdfFileCfg", "UrdfConverterCfg") and None not in kws:
-            for field, why in (("joint_drive", "the default JointDriveCfg leaves gains.stiffness MISSING"),
-                               ("fix_base", "fix_base is MISSING")):
-                if field not in kws and field not in assigned:
-                    findings.append((call.lineno, "ISC040",
-                                     "{}(...) without {}=: {}, so cfg validation fails".format(name, field, why)))
+            if "fix_base" not in kws and "fix_base" not in assigned:
+                findings.append((call.lineno, "ISC040", "{}(...) without fix_base=: fix_base is MISSING, so cfg "
+                                 "validation fails".format(name)))
+        if isinstance(call.func, ast.Attribute) and WRITE_RE.match(call.func.attr):
+            findings.append((call.lineno, "ISC060", "{}() is deprecated (DeprecationWarning, forwards to the _index "
+                             "variant): use {}".format(call.func.attr, write_replacement(call.func.attr))))
+
+    # attribute-level rules
+    for node in ast.walk(p.tree):
+        if isinstance(node, ast.Attribute):
+            attr = node.attr
+            if attr in DEPRECATED_ATTRS:
+                findings.append((node.lineno, "ISC061", "{}: deprecated in 3.0, use {}".format(attr, DEPRECATED_ATTRS[attr])))
+            elif attr in DEPRECATED_DATA and on_data(node):
+                findings.append((node.lineno, "ISC061", "data.{}: deprecated in 3.0, use robot.{}".format(
+                    attr, DEPRECATED_DATA[attr])))
+            elif attr in REMOVED_DATA and on_data(node):
+                findings.append((node.lineno, "ISC062", "data.{}: {}".format(attr, REMOVED_DATA[attr])))
+            elif OBJECT_DATA_RE.match(attr) and on_data(node):
+                findings.append((node.lineno, "ISC061", "data.{}: deprecated RigidObjectCollection name, use {}".format(
+                    attr, attr.replace("object_", "body_", 1) if attr != "default_object_state" else "default_body_state")))
+            elif attr in MOVED_ATTRS:
+                findings.append((node.lineno, "ISC003", "{}: removed in Lab 3.0, use {} (the old full-state Imu is "
+                                 "now Pva)".format(attr, MOVED_ATTRS[attr])))
+            elif attr in VIEWER_FIELDS and isinstance(node.value, ast.Attribute) and node.value.attr == "viewer":
+                findings.append((node.lineno, "ISC071", "env_cfg.viewer.{} is deprecated: set "
+                                 "sim.default_visualizer_cfg = VisualizerCfg(eye=, lookat=) (asset tracking: "
+                                 "KitVisualizerCfg(origin_type=\"asset\", origin_track_path=))".format(attr)))
+            elif attr in ("XformPrimView", "ViewerCfg", "ViewportCameraController"):
+                if attr == "XformPrimView":
+                    findings.append((node.lineno, "ISC061", "XformPrimView: deprecated alias, use FrameView"))
+                else:
+                    findings.append((node.lineno, "ISC071", "{} is deprecated: set sim.default_visualizer_cfg = "
+                                     "VisualizerCfg(eye=, lookat=) instead".format(attr)))
+        elif isinstance(node, ast.Name):
+            if node.id == "XformPrimView":
+                findings.append((node.lineno, "ISC061", "XformPrimView: deprecated alias, use FrameView"))
+            elif node.id in ("ViewerCfg", "ViewportCameraController"):
+                findings.append((node.lineno, "ISC071", "{} is deprecated: set sim.default_visualizer_cfg = "
+                                 "VisualizerCfg(eye=, lookat=) instead".format(node.id)))
     return out
+
+
+def _yaw_message(value):
+    new = 'ray_alignment="base"'
+    if isinstance(value, ast.Constant) and value.value is True:
+        new = 'ray_alignment="yaw"'
+    return "attach_yaw_only was removed from RayCasterCfg: use {} (False -> \"base\", True -> \"yaw\", \"world\" is new)".format(new)
+
+
+def _quat_message():
+    return ("rot=(1.0, 0.0, 0.0, 0.0) is the wxyz identity, but Lab 3.0 quaternions are xyzw, so this is a 180 degree "
+            "rotation about x: the identity is (0.0, 0.0, 0.0, 1.0) (ignore if the 180 degree rotation is intended)")
 
 
 def not_ignored(apath, finding):

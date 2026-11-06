@@ -1,23 +1,14 @@
----
-name: rl-experiment-log
-description: Keeps a lab notebook of RL/IL training runs (e.g. Isaac Lab rsl_rl/skrl PPO, SAC, BC/DAgger distillation) - base run, the one change, config, code commit, exact command and inputs, task metric, verdict, next step. Use whenever the user starts, stops, sweeps or compares training runs, asks what was tried before or which run was best, is about to change a reward term/weight, curriculum, domain randomisation or hyperparameter, or mentions an experiment log, run log, decision ledger, TensorBoard/W&B run or sim-to-real test. Not for writing env code (isaac), comparing papers (robotics-research-brief) or explaining why a run behaves as it does and what to try (rl-advisor).
----
+# Run log for Isaac Lab and repos without a ledger: entry template, run dirs, the Changed check
 
-# RL experiment log
+Used by SKILL.md's record step when the repo keeps no ledger of its own (no `## Experiments` section in CLAUDE.md
+and no `Decision ledger`), typically an Isaac Lab rsl_rl / skrl run (cooper, berkley). aquila does not use this
+template: its record step is `aquila-map.md` §13 (manifest + gate file → ledger row + EVIDENCE §9). The rules that
+apply to every repo (one variable, task metric, noise floor, sim-to-real entry, frozen verdicts) are in SKILL.md;
+this file holds the template and the Isaac Lab mechanics.
 
-Arlan trains RL/IL policies in several repos (e.g. cooper: Isaac Lab PPO fine-tuned from BC; aquila/raptor-torch: SAC teachers → DAgger student; TVC rocket; Unitree G1 motion tracking). The problem this skill solves: after a few days it's unclear what was tried and why a reward change helped. Project specifics (where runs are recorded, which metric counts, where run dirs live) come from the repo's CLAUDE.md (its `## Experiments` section if it has one), not from this skill. Use the `isaac` skill for the code itself; this skill is for the record around it.
+Contents: 1 Start entry · 2 Code, run-id and run dir · 3 Filling and checking it from the config dump · 4 Result block · 5 Isaac Lab rules · 6 Example (cooper) · 7 Remote host
 
-## Resolve the log first
-
-Once per project, pick where entries go, in this order:
-
-1. The project CLAUDE.md has a `## Experiments` section: use its `log:` path. Its other `key: value` lines fill the matching fields: `run-id:` prefix, `runs:` host:path of the run dirs, `metric:` the task metric, `eval:` the eval command, `framework:` rsl_rl|skrl|custom.
-2. The repo already keeps a results ledger (`grep -rl 'Decision ledger' --include='*.md' .`; aquila: `raptor-torch/STATUS.md` ledger + `EVIDENCE.md`): write there in that ledger's own format. Map this skill's fields onto its columns and put the detail in its evidence doc. If the ledger takes results only, put the start block wherever the repo's doc map puts plans and pre-registrations (aquila: `PLAN.md` next actions, at that doc's own heading level), or ask if the map doesn't say; the ledger row and its evidence section land with the Verdict.
-3. Otherwise propose `experiments/LOG.md` (in a monorepo, next to the training package). First run `git check-ignore -q <path>`; if the path is ignored, use `docs/EXPERIMENTS.md` instead and say so. If the repo has a doc-ownership map (cooper's CLAUDE.md), ask before creating the file and add it to the map in the same change.
-
-Once resolved, offer to record the choice as a `## Experiments` section. The repo log is the only home for run history. The Obsidian vault gets a summary only on request, at `~/obsidian/ruhalis/1. Projects/<Project>/Experiments.md`, linking back to the repo log.
-
-## When a run starts or a config changes
+## 1. Start entry
 
 Add one entry to the resolved log:
 
@@ -40,20 +31,24 @@ Add one entry to the resolved log:
 - Expected: <what task metric should move, by how much, by which iteration>
 ```
 
+## 2. Code, run-id and run dir
+
 Code is the task repo as checked out on the training host, not Isaac Lab; add `-dirty` when `git status --porcelain` is not empty. A dirty tree's code edits (function bodies, the constants they read, new files) reach neither params/ nor git, so right after launch, before touching the tree, save them: `git -C <repo> diff HEAD > <run dir>/task_repo.diff; git -C <repo> status --porcelain > <run dir>/task_repo.status` (untracked files show there by name only; commit or copy them). rsl_rl's own `<run dir>/git/*.diff` covers only Isaac Lab and rsl_rl. Stack also comes from the training host: `<venv>/bin/python -m pip list | grep -iE '^(isaacsim|rsl-rl-lib|skrl|torch) '`, plus `VERSION` and `git rev-parse --short HEAD` in the Isaac Lab checkout that venv imports (`python -c 'import isaaclab; print(isaaclab.ISAACLAB_EXT_DIR)'` prints its `source/isaaclab`).
 
 The run-id is `<short-task-slug>-<NNN>` (e.g. `pick-ik-004`), where NNN is the highest number already in that log plus 1. Put it in the run dir's name:
 - rsl_rl: `--run_name <run-id>` gives `logs/rsl_rl/<experiment_name>/<YYYY-MM-DD_HH-MM-SS>_<run-id>` under the launch directory. With `--logger wandb` the W&B run takes that directory's name, the project is `--log_project_name` (agent.yaml `wandb_project`), the entity `$WANDB_USERNAME` or the account default.
 - skrl: the Hydra override `agent.agent.experiment.experiment_name=<run-id>` gives `logs/skrl/<experiment.directory>/<timestamp>_<algo>_<ml_framework>_<run-id>`.
-- A custom trainer (e.g. aquila's): Run dir is wherever it writes.
+- A custom trainer (e.g. aquila's, which records differently: `aquila-map.md` §13): Run dir is wherever it writes.
 
-Fill Env through Seed(s) from the run's own config dump, not by walking the cfg inheritance chain: Isaac Lab's train.py writes `<run dir>/params/env.yaml` (`rewards:`, `curriculum:`, `events:`, `scene.num_envs`, `sim.dt`, `decimation`, `episode_length_s`, `seed`) and `params/agent.yaml` (Algo) at launch. Their `!!python/tuple` and `!!python/object/apply:builtins.slice` tags make `yaml.safe_load` and `yaml.full_load` (Isaac Lab's own `load_yaml`) fail, so read them as text or run `scripts/rl_log_entry.py <run dir> [--base <base run dir>] [--ignore seed]`, which prints the lines they can fill and, with `--base`, the Changed line. It needs PyYAML, which the Isaac Lab venv has and the Mac's system python3 lacks (exit 3), so pipe it to the training host: `ssh <host> '<venv>/bin/python - <run dir> --base <base run dir>' < "${CLAUDE_SKILL_DIR}/scripts/rl_log_entry.py"` (`${CLAUDE_SKILL_DIR}` is this skill's directory). It is validated only on synthetic run dirs written by Isaac Lab 2.3.2's own dump code; check its first real output against the yaml.
+## 3. Filling and checking it from the config dump
+
+Fill Env through Seed(s) from the run's own config dump, not by walking the cfg inheritance chain: Isaac Lab's train.py writes `<run dir>/params/env.yaml` (`rewards:`, `curriculum:`, `events:`, `scene.num_envs`, `sim.dt`, `decimation`, `episode_length_s`, `seed`) and `params/agent.yaml` (Algo) at launch. Their `!!python/tuple` and `!!python/object/apply:builtins.slice` tags make `yaml.safe_load` and `yaml.full_load` (Isaac Lab's own `load_yaml`) fail, so read them as text or run `scripts/rl_log_entry.py <run dir> [--base <base run dir>] [--ignore seed]`, which prints the lines they can fill and, with `--base`, the Changed line. It needs PyYAML, which the Isaac Lab venv has and the Mac's system python3 lacks (exit 3), so pipe it to the training host: `ssh <host> '<venv>/bin/python - <run dir> --base <base run dir>' < "${CLAUDE_SKILL_DIR}/scripts/rl_log_entry.py"` (`${CLAUDE_SKILL_DIR}` is the rl-advisor skill's directory). It is validated only on synthetic run dirs written by Isaac Lab 2.3.2's own dump code; check its first real output against the yaml.
 
 Once the run dir exists, check that Changed is the only difference from Base: `diff -u <base run dir>/params/env.yaml <new run dir>/params/env.yaml` and the same for agent.yaml (dumped in cfg order, so the lines pair up), or `rl_log_entry.py <new run dir> --base <base run dir>`, plus `git -C <task repo> diff --stat <base sha>..<new sha>` from the two Code lines. A `-dirty` side's config edits show only in the params diff and its code edits in neither, so also `diff` the two runs' task_repo.diff files. Ignore log_dir, run_name, the logging backend (logger, wandb_project, neptune_project; skrl: experiment.directory, experiment_name, write_interval, wandb, wandb_kwargs), which the script leaves out, and seed when the seed is the declared change. Unless the entry is a declared sweep, every other difference goes on a `- Confounded: <each undeclared difference>` line under Changed, and the Verdict then judges the bundle, never the declared change alone.
 
 An entry is open until it has a Verdict. Fill its result block under its own heading, not at the end of the file, replacing any `pending` values once the numbers arrive. After the Verdict it is frozen; corrections go in a new entry with `Base: <run-id> (correction)`.
 
-## When a run finishes or is stopped
+## 4. Result block
 
 Fill in under the entry's own heading:
 
@@ -65,7 +60,13 @@ Fill in under the entry's own heading:
 
 If asked to summarise, produce a table of run-id | changed | key metric | verdict from the log, where key metric is the task metric from Result, then a short read of the trend.
 
-## Example
+## 5. Isaac Lab rules
+
+- A stack bump (Isaac Sim, Isaac Lab, rsl-rl-lib/skrl, torch) is its own run: Changed is the bump and nothing else, Base is the last run on the old stack.
+- Never compare Train/mean_reward or Episode_Reward/* across runs whose reward weights or params differ; Isaac Lab multiplies each term by its weight before logging. The Verdict must cite the task metric; if the run is closed without one, the Verdict is inconclusive.
+- Before proposing a reward change, check the log for the last time that term was touched (a params-only change counts) and what happened. If no log entry covers the term, check `git log -L '/[^_[:alnum:]]<term>[^_[:alnum:]].*=/,/^ *)/:<reward/env cfg file>'` (the range ends at the term's closing paren) (`git log -S'<term>'` only finds where the term was added or removed), the comments next to the term, and the project ledger before proposing.
+
+## 6. Example (cooper)
 
 A filled entry from cooper's history, before it kept a log (abridged; run-ids illustrative, `?` = not recorded at the time). The recorded run also changed the curriculum, so it shows the Confounded line too:
 
@@ -91,25 +92,7 @@ A filled entry from cooper's history, before it kept a log (abridged; run-ids il
 - Next: IL warm start (scripted IK expert → BC → PPO fine-tune)
 ```
 
-The same fields collapsed into one row of an existing ledger (aquila `STATUS.md`), in that ledger's own format, with the eval protocol in What and the detail in its evidence doc. The row predates the noise rule below, hence `sd ?`:
-
-```
-| 07-02 | Obs-noise + obs-bias lever: re-distill, A/B vs clean baseline, 64 airframes × 16 eps at 1× (trained) and 2× (held-out) | **The one big win**: +147 @1×, +288 @2× held-out (sd ?); bias is dead weight (dropped); obs-noise locked in as the standing distill default | EVIDENCE §3 |
-```
-
-## Rules
-
-- One variable per run unless explicitly doing a sweep; a sweep is one entry with a sub-table.
-- A reward-formula change in code counts as the one Changed variable and must cite the commit.
-- A stack bump (Isaac Sim, Isaac Lab, rsl-rl-lib/skrl, torch) is its own run: Changed is the bump and nothing else, Base is the last run on the old stack.
-- Never compare Train/mean_reward or Episode_Reward/* across runs whose reward weights or params differ; Isaac Lab multiplies each term by its weight before logging. The Verdict must cite the task metric; if the run is closed without one, the Verdict is inconclusive.
-- Keep or discard only when the task-metric delta is larger than the noise: at least 2 seeds per arm, or a stated sd from a fixed eval (N episodes, play env, deterministic actions, a named checkpoint, final or best, picked the same way for both arms). Otherwise the Verdict is inconclusive. Picking the best of N checkpoints or seeds inflates a result by itself (the best of 10 draws sits about 1.5 sd above their mean).
-- Sim-to-real: log the real-robot test as a new entry with `Base: <sim run-id>` and `- Deployed: <checkpoint/export path + sha256 or export manifest>, robot, firmware/controller rev, date` and `- Real: <outcome, e.g. walks 5 m, falls on turn>`, so the sim verdict stays frozen. The DR ranges are in the sim entry's DR line.
-- Before proposing a reward change, check the log for the last time that term was touched (a params-only change counts) and what happened. If no log entry covers the term, check `git log -L '/[^_[:alnum:]]<term>[^_[:alnum:]].*=/,/^ *)/:<reward/env cfg file>'` (the range ends at the term's closing paren) (`git log -S'<term>'` only finds where the term was added or removed), the comments next to the term, and the project ledger before proposing.
-- Keep it terse; this is a lab notebook, not a report.
-
-## Degradation
+## 7. Remote host
 
 - Run artifacts on a remote training host: ask the user for the run-dir listing, the final scalars and `git -C <repo> rev-parse --short HEAD && git -C <repo> status --porcelain` from the host, or rsync the run's config dump and logs (Isaac Lab: `params/` + `events.out.tfevents.*`). Never invent numbers; write `Result: pending (on <host>:<path>)` and leave the entry open. Without the host's sha, write `Code: unknown (local <sha>)`.
-- No repo filesystem (claude.ai): output the entry as a fenced block for the user to paste.
 - Task metric never evaluated and the run is being closed anyway: Next is the eval to run.

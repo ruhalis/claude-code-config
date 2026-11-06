@@ -5,31 +5,28 @@ description: "Use when comparing models, papers, datasets or toolchains for robo
 
 # Robotics research brief
 
-Arlan does physical-AI R&D. Interests as of 2026-09 (starting points only; search for newer releases from the last ~6 months before comparing): GR00T N1.7, Cosmos 3, VLAs like π0.5/OpenVLA (RT-2: closed, reference only), world models like DreamerV3/JEPA, motion retargeting GVHMR (non-commercial license)→GMR→BeyondMimic. Robots and compute come from the project (step 1); Known platforms below is the fallback only. Briefs are for deciding what to build or adopt next, so they must end in a decision, not a survey.
+Arlan does physical-AI R&D. Recurring topics (starting points, not a reading list; versions move fast, so search the last ~6 months for each one's current release before comparing): robot foundation models (GR00T, Cosmos), VLAs (π0.x, OpenVLA; RT-2 is closed, reference only), world models (DreamerV3, JEPA), motion retargeting (GVHMR, non-commercial license → GMR → BeyondMimic), and RL for quadrotors, the aquila track (foundation policies like rl-tools' RAPTOR, recurrent sim-to-real policies, vision planners for agile flight). Robots and compute come from the project (step 1); Known platforms below says where to read them. Briefs are for deciding what to build or adopt next, so they must end in a decision, not a survey.
 
 ## Before writing
 
 0. Pick the mode first: brief, peer review, or related work (a brief plus its final section). Peer review starts at its gate, before steps 1–4. Never run step 3 on a manuscript under review.
-1. Project facts come from the repo. Before searching, read the current repo's CLAUDE.md (`## Hardware` / `## Where things run`) and project memory. Take the robot, GPU model and VRAM, Jetson module and JetPack, and simulator and version from there (whichever apply), and state them in the Question line. If the request names a robot or project in Known platforms, read that project's CLAUDE.md (Source column) even from another repo. Where memory and CLAUDE.md disagree, CLAUDE.md wins.
-2. Ask one question only if the decision axis is unclear (e.g. "is this for on-Jetson inference or workstation training?") or there is no project context (which robot / which compute?). Cannot ask: use Known platforms below and state the assumption in the Question line.
+1. Project facts come from the repo. Before searching, read the current repo's CLAUDE.md (`## Hardware` / `## Where things run`; a repo without those sections states its hardware inline, so `grep -n 'RTX\|GB\|Jetson\|ESP32' CLAUDE.md`) and project memory. Take the robot, GPU model and VRAM, Jetson module and JetPack, and simulator and version from there (whichever apply), and state them in the Question line. If the request names a robot, machine or project in Known platforms, read the file in its Read column even from another repo. Where memory and CLAUDE.md disagree, CLAUDE.md wins.
+2. Ask one question only if the decision axis is unclear (e.g. "is this for on-Jetson inference or workstation training?") or there is no project context (which robot / which compute?). Cannot ask: read the project Known platforms points at and state the assumption in the Question line; with no file access either, write "platform unknown" there and judge each candidate against its own minimum requirements.
 3. Search. Papers, model cards, GitHub READMEs, release notes — current facts only, with links. Note release dates. License: read the LICENSE file and the model card, not GitHub's SPDX badge (NOASSERTION = read the file). Check code, weights, body models and datasets separately. Flag non-commercial, research-only or gated terms in Gaps and risks, and say which intended use (commercial or research) the verdict assumes.
 4. Every number in Key evidence and the compute column comes from a primary source you opened (paper, model card, README, release notes), never a search-result summary. Tag each result with [real|sim], embodiment, N trials and model version; tag inference numbers with device and precision. If the embodiment or device isn't ours, write "measured on <X>; ours is <Y>". If the primary source could not be opened, append "(unverified)".
 
-## Known platforms (fallback only; the project CLAUDE.md wins)
+## Known platforms (where to read them)
 
-Step 1 uses the Source column to find a named robot's project. Use the Facts only when step 1 finds no project facts and step 2 cannot ask. Name the one you assumed in the Question line.
+Step 1 uses this table to find a named robot's or machine's facts. It carries no numbers on purpose: GPUs, VRAM and boards change, and the project files are the ones kept current. Read the file, then name the platform and the fact you used in the Question line. Project files can disagree (cooper's names an RTX 5080 dev box; aquila's says training moved to the RTX 3080 box and its 5080 numbers are historical): name the source you used and flag the disagreement in Gaps and risks.
 
-| Platform | Facts | Source |
-|---|---|---|
-| Workstation | RTX 5080 16 GB, Ubuntu 22.04 | ~/projects/cooper/CLAUDE.md:25, ~/projects/aquila/CLAUDE.md:11 |
-| Overnight training | H200 141 GB, nights only | ~/projects/cooper/CLAUDE.md:26; nvidia.com/en-us/data-center/h200 |
-| RTX 5090 32 GB | (unconfirmed - ask the user) | memory note only |
-| cooper arm | myCobot 280, 6-DOF + adaptive gripper, trained in Isaac Lab | ~/projects/cooper/CLAUDE.md:7-9 |
-| berkley humanoid | Berkeley Humanoid Lite, 22 DoF; onboard Beelink Mini S12 (Intel N95, 8 GB); Isaac Lab + rsl_rl | ~/projects/berkley/CLAUDE.md:56-63 |
-| aquila drone | raptor-torch policy trained on the RTX 5080, deployed to ESP32-S3 / STM32 | ~/projects/aquila/CLAUDE.md:9-11 |
-| Unitree G1 EDU (archived projects) | Jetson Orin NX 16GB, JetPack 6.x, CUDA 12.x | ~/projects/archive/g1_concierge/CLAUDE.md:7 |
-| Unitree Go2 EDU (archived projects) | optional Orin module, 40–100 TOPS; which module: (unconfirmed - ask the user) | unitree.com/go2 spec table |
-| Simulator | Isaac Lab at the version in the isaac skill's `metadata: isaac-lab-version` (`../isaac/SKILL.md` frontmatter) | isaac skill |
+| Platform | Read |
+|---|---|
+| aquila drone: training GPU box, deploy MCU | `~/projects/aquila/CLAUDE.md` (`grep -n 'RTX\|ESP32'`: the `verro/` bullet under Repository layout, the firmware paragraph under Commands) |
+| cooper arm, its dev box and the overnight training GPU | `~/projects/cooper/CLAUDE.md`, `## What this is` and `## Where things run` |
+| berkley humanoid and its onboard computer | `~/projects/berkley/CLAUDE.md`, `## 2. Quick facts` |
+| Isaac-L2F (aquila's Isaac Sim flight tools) | `~/projects/Isaac-L2F/CLAUDE.md`, `## Toolchain` (its Isaac Sim version differs from the isaac skill's) |
+| Simulator | Isaac Lab at the version in the isaac skill's `metadata: isaac-lab-version` (`../isaac/SKILL.md` frontmatter) |
+| Unitree G1 / Go2, an RTX 5090 | no project file on this machine (the G1 projects were archived and are gone from `~/projects`): ask the user |
 
 ## Brief format (Markdown file; see Saving)
 

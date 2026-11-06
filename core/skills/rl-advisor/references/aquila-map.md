@@ -13,10 +13,11 @@ closed results. Everything that moves (the shipped student, open decisions, in-f
 campaign) and `verro/EVIDENCE.md` (the numbers; EVIDENCE §9 holds the full rows). A row ID here is a pointer: read the row
 for the verdict (§11). A bare §n in this file is a section of this file; EVIDENCE sections are always written "EVIDENCE §n".
 Paths are repo-root relative; `v/` = `verro/verro/`, `t/` = `verro/tools/`; line numbers drift, so re-grep before citing. "PLAN
-item n" is the root `PLAN.md` pre-registration list, removed in f0d12c7 (2026-10; `git show f0d12c7^:PLAN.md`); later plans: root `verro-*.md`.
+item n" is the root `PLAN.md` pre-registration list, removed in f0d12c7 (2026-10; `git show f0d12c7^:PLAN.md`); later plans: the track's plan doc (`verro-lookahead.md` §0) and `prereg_<id>.md` files beside the eval outputs (§13).
 
 Contents: 1 Hyperparameters · 2 SAC · 3 Replay and Adam · 4 Reward, termination, observation · 5 Domain randomisation ·
-6 DAgger distillation · 7 Selection and gates · 8 Levers · 9 Method · 10 Closed results · 11 Moving state and names · 12 Book ↔ aquila
+6 DAgger distillation · 7 Selection and gates · 8 Levers · 9 Method · 10 Closed results · 11 Moving state and names · 12 Book ↔ aquila ·
+13 Recording a run
 
 ## 1. Hyperparameters (`v/config.py`, transcribed from `pre_training/config.h`, `post_training/config.h`)
 
@@ -161,17 +162,27 @@ Standing distill defaults are kept levers with ledger rows (STATUS "Standing dec
 - **Clean gate, perturbed rollouts only**: the teacher gate and the offset estimation never see a lever.
 - Levers and the dynamics hash are recorded in every checkpoint, snapshot, teacher and gate file; `--resume`
   refuses a mismatch; a bank mixing physics refuses to load.
+- **Speed levers are kept only bit-exact.** A lever that buys wall time must leave every number unchanged:
+  `t/speed_research/compare_runs.py` compares checkpoint, snapshots, actors, gate and log as int32 views and must
+  report IDENTICAL on full-length waves, not only on smokes (L45 CUDA graphs, L46 fused Adam, L62 fused collect).
+  A speedup that changes the numbers is a quality change priced against the task metric like any lever: early
+  stopping, TF32/bf16 and inductor fusion were all turned down on that ground (L44). `--cuda-graph` is recorded in
+  provenance, not as a lever; `--fused-collect` refuses TF32, a non-diagonal inertia J and the drag, fault, wind, obs-bias and ref-speed levers.
+- **CUDA-graph replay beside other GPU work faults the RTX 3080** on driver 595.99.02 (Xid 31, reproduced by
+  `t/speed_research/graph_overlap_fault.py` with no verro code), so two-stream overlap (`--overlap-update`) is gated
+  off behind `VERRO_UNSAFE_GRAPH_OVERLAP=1`. Do not propose stream overlap or a second concurrent graph on that box
+  while that driver stands; read L60 for the idle-GPU rerun.
 
 ## 9. Experimental method (how verdicts are reached)
 
 - One variable per run; a lever is compared to the baseline arm on the same frames, seeds and eval protocol; seed
   sd is stated; the verdict is keep / discard / inconclusive and lands as one ledger row (STATUS) pointing at an
-  EVIDENCE section. Pre-registered gates (PLAN items, later the `verro-*.md` plans) name the metric, the bar and
+  EVIDENCE section. Pre-registered gates (PLAN items until f0d12c7; since then the track's plan doc and `prereg_<id>.md`, §13) name the metric, the bar and
   the kill rule before the run. An A-vs-A′ arm (same recipe, new teacher seed) is the noise floor a lever must
   clear (the lookahead pilot pre-registered one, L47–L54); a two-seed gate that splits is "not met" (`diagnostics.md` §6).
 - Task metrics: fleet mean return and frames below 300 (1000 × 32); A4 survival / excursion / settle; tracking error on
   held-out figure-eights (lookahead). Training return is never the metric when the dataset or the env differs between arms.
-- The record lives in the repo: rl-experiment-log's entry format maps onto the ledger row + EVIDENCE section.
+- The record lives in the repo: manifest + gate file → one STATUS row + the same-ID EVIDENCE §9 row (§13).
 
 ## 10. What was measured: closed results, with numbers
 
@@ -236,3 +247,34 @@ Standing distill defaults are kept levers with ledger rows (STATUS "Standing dec
 | 13.5 actor–critic, 13.7 Gaussian policy | SAC actor with state-dependent log-std, tanh squash |
 | 17.3 state from observations | the GRU student identifies the airframe from history (R² 0.94) |
 | 17.4 reward design | lever verdicts by task metric (frames below gate, survival), never by return under a changed env |
+
+## 13. Recording a run
+
+The ledger takes results only (`CLAUDE.md` document map: "Results land here; plans do not").
+
+- **Before the run**: the pre-registration (arms, the one variable, task metric, bar, noise floor, kill rule) goes
+  in the plan doc that owns the track (`verro-lookahead.md` §0 for the lookahead pilots) or in a `prereg_<id>.md`
+  beside the eval outputs (`verro/runs/<track>/eval/`, gitignored, so say which machine holds it). The row cites it
+  by name.
+- **What the run leaves**: `run_waves.py --out runs/<bank>` writes `runs/<bank>/manifest.json`
+  (`{"waves": {"<n>": {...}}}`; per wave `status`, `attempts`, `elapsed_s`, `gate {num_passed, num_total,
+  num_dead}`, and in the current format `cmd` and `levers`, the seed inside `cmd` as `--seed`). Each wave's
+  `train_teachers.py` writes `gate_<tag>.json` (tag `wave{N}`, `off{K}_wave{N}` with an index offset, `custom` for
+  `--indices`): `gate_return`, `gate_episodes`, `num_passed` / `num_total` / `num_dead`, per teacher
+  `returns_mean`, `passed`, `dead`, `nan_events`, then `levers` with `dynamics_sha256`, and `provenance`
+  (`v/provenance.py:provenance`: `git_sha`, `git_branch`, `git_dirty` for tracked files, `hostname`, `argv`,
+  `args`, torch, CUDA, the TF32 flags, `resumed_from`). Older manifests hold only status, attempts, time and gate
+  counts: take the command and levers from the gate file's `provenance.argv` and `levers`. Distill and eval runs
+  write under `runs/distill*` and `runs/<track>/eval/`; a student is named by its weight sha `w:<sha8>`.
+- **Code**: `provenance.git_sha` (with `-dirty` when `git_dirty`) on `git_branch`, and `hostname` for the box. The
+  manifest carries no sha.
+- **The STATUS row**: the next ID after `grep -n '^| L' verro/STATUS.md | tail -1`, columns
+  `| # | Date | What | Verdict | Evidence |`, date `MM-DD`, one line of about 180 characters at most: what changed
+  on which bank or recipe, the **VERDICT** in bold with the one number that decided it, refs (`EVIDENCE §9 Lnn`,
+  the run dir as `box runs/...` or `Mac runs/...`, the prereg or tool). Recent rows overrun the length; the rule in
+  the ledger header and `CLAUDE.md` still stands.
+- **The EVIDENCE §9 row**: same ID and columns, appended to the §9 table: the protocol (arms, frames × episodes,
+  seeds, eval seed, checkpoint and how it was picked), the numbers with sd or CI, the noise floor they were judged
+  against, caveats, and provenance (git sha and dirty flag, host, command or argv). A long story goes in a
+  `**Lnn detail (...)**` block below the table. A row overtaken later gets a supersession note, never a rewrite
+  (`EVIDENCE.md` header).

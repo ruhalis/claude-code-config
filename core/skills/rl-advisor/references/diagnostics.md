@@ -73,11 +73,13 @@ infrastructure · 9 Questions to ask before proposing a lever
   such rates 0.05 apart are within one draw of each other. aquila's per-frame pass/fail counts (the "binomial sd ≈ 5"
   on 1000 frames) are the same formula.
 - **Seeds**: ≥ 3 per arm to say "better", ≥ 5 to size an effect; with 2 the honest verdict is
-  "inconclusive" (rl-experiment-log's rule). `compare_arms.py compare --a … --b …` prints the bootstrap
-  CI, Welch t, IQM and P(b > a); `--paired` when arms share seeds/frames.
-- **Best-of-N inflation**: `compare_arms.py max-of-n N --sd σ`. Subtract it mentally from any "best
-  checkpoint" claim; compare picks against picks made the same way, or re-evaluate the pick on fresh
-  seeds.
+  "inconclusive". This section is the one home of the keep/discard rule that SKILL.md's Rules cite.
+  `compare_arms.py compare --a … --b …` prints the bootstrap CI, Welch t, IQM and P(b > a); `--paired`
+  when arms share seeds/frames.
+- **Best-of-N inflation**: `compare_arms.py max-of-n N --sd σ`; the max of 10 draws sits ≈ +1.5 sd above
+  their mean, of 20 ≈ +1.9 sd (aquila's shipped single epoch was a +2.4 sd draw, EVIDENCE §6.6). Subtract it
+  from any "best checkpoint" claim; compare picks against picks made the same way, or re-evaluate the pick on
+  fresh seeds. The plateau average (SWA/EMA) is usually worth more than the pick (EVIDENCE §7.5).
 - **Noise floor**: an A-vs-A′ arm (same config, new seed) measured on the same protocol is the bar a
   lever must clear; without it, use the across-seed sd of the baseline.
 - **Held-out selection**: select on one half, report on the other (aquila `--split t2i`); the rank-1 vs
@@ -98,7 +100,7 @@ infrastructure · 9 Questions to ask before proposing a lever
 
 ## 7. Reward changes
 
-1. Before changing a term, find the last time it was touched and what happened (rl-experiment-log:
+1. Before changing a term, find the last time it was touched and what happened (the record:
    the log, `git log -L` on the term, the ledger).
 2. Is the change potential-based (F = γΦ(s') − Φ(s))? If not, it can change the optimal policy; say so
    and watch the task metric, not the return.
@@ -114,7 +116,7 @@ infrastructure · 9 Questions to ask before proposing a lever
 | NaN loss from epoch 0 | a NaN in a masked statistic (NaN·0 = NaN; use `where`); a terminated env still integrating; log-prob of a saturated tanh action |
 | Resume differs from the uninterrupted run | RNG state restored on the wrong device, replay not persisted, lever flags not persisted (aquila: all three happened; now recorded in every checkpoint) |
 | Adam behaves differently from the reference implementation | ε placement (inside vs outside the sqrt), bias correction, weight decay coupling; rl-tools floors v̂ at 1e-7 inside the sqrt |
-| Throughput: GPU busy < 60 % | launch-bound (many small kernels per step); CUDA graphs / fused kernels (aquila: 1017 kernels/iter, 2.5× from graphs + fused Adam, bit-identical) |
+| Throughput: GPU busy < 60 % | launch-bound (many small kernels per step); CUDA graphs / fused kernels (aquila: 1017 kernels/iter, 2.5× from graphs + fused Adam, bit-identical). Keep a speed lever only if it is bit-identical at full length (`aquila-map.md` §8) |
 
 ## 9. Questions to ask before proposing a lever
 

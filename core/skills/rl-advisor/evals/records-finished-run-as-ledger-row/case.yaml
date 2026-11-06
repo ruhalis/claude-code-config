@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: records-finished-run-as-ledger-row
+expected_outcome: |
+  The answer drafts the record without editing any file. It reads the newest row of the decision
+  ledger in verro/STATUS.md and uses the next Lnn ID (not a guessed one), writes one STATUS line in the
+  ledger's | # | Date | What | Verdict | Evidence | format at about 180 characters or less with the
+  verdict in bold and refs to EVIDENCE §9 Lnn and the two run dirs, and writes the same-ID EVIDENCE §9
+  row with the protocol (64 teachers × 100 gate episodes, one seed per arm), the numbers for both arms,
+  the missing noise floor, and the provenance from the gate files (git sha marked dirty, branch, host,
+  argv). The verdict is inconclusive, not keep: one seed per arm with no A-vs-A′ arm, a two-teacher
+  difference in passes and a 15-point mean difference are inside the noise, and the dirty tree means the
+  sha alone does not reproduce the lever. Next is a second and third seed per arm or the A-vs-A′ arm.
