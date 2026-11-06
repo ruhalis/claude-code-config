@@ -86,7 +86,7 @@ Pick the cheapest level that will make the idea click; go up only when the idea 
 
 ## Lesson page
 
-One private Artifact page per lesson, built in the scratchpad directory at `teach/<slug>/index.html` with its media under `teach/<slug>/media/`.
+One private Artifact page per lesson, built in the scratchpad directory at `teach/<slug>/index.html` with its media under `teach/<slug>/media/`. If the system prompt lists no scratchpad, build it at `~/.claude/teach/lessons/<slug>/index.html` and embed media as `data:` URIs: the Artifact tool only takes `files` from the working directory or the scratchpad.
 
 - Before writing the first page of a lesson, call the Artifact tool with `action: "quickstart"`, `intent: "other"`, and follow what it returns (it covers the page design guidance).
 - Structure: title, the learner's goal, the dependency map (inline SVG), one section per node (motivation, statement, visual, a "check yourself" question with the answer in a `<details>` reveal), and a summary of core truths at the top once the lesson is done.

@@ -26,6 +26,7 @@ core/                  source of truth: agents and skills
   skills/*/              SKILL.md skills
   skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
   skills/teach/          personal tutor, quizzes and Artifact lessons (written for Claude Code: uses AskUserQuestion, Agent and Artifact; package-skills.sh still packages it)
+  skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code, like teach)
 adapters/
   claude/                CLAUDE.md + settings.json + keybindings.json + subagent-statusline.sh + hooks/
   vscode/                extensions.txt — extension IDs to install; settings.json — user settings (merged)
