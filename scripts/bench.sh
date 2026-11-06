@@ -145,6 +145,23 @@ done
 for c in "pytest -q" "idf.py -C dir build" "npm test" "npx hyperframes render"; do
     check "subagent allows: $c" pass_sub "$c"
 done
+# heredoc bodies and quoted strings are ignored when matching
+for c in $'git commit -q -F - <<\'EOF\'\nbuild ok, the shim builds, pytest 382 passed / 6 CUDA skips\nEOF' \
+    $'cat > note.md <<EOF\ntests run as cd x && python -m pytest -q\nEOF\necho ok' \
+    $'cat <<-\'EOF\'\n\tmake test\n\tEOF' \
+    'git commit -m "ran pytest and cargo build"' 'echo "npx hyperframes render"' \
+    'idf.py -C "/x/build" -p "/dev/cu.usbmodem1" flash'; do
+    check "main allows: $c" pass_main "$c"
+done
+for c in $'cat > a.md <<\'EOF\'\nnotes\nEOF\npytest -q' \
+    $'git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && cargo test' \
+    'idf.py -C "/x/build" -p "/dev/cu.usbmodem1" build' 'cd /tmp/x && uv run pytest'; do
+    check "main denies: $c" deny_main "$c"
+    check "deny reason names verifier: $c" reason_has verifier "$c"
+done
+c='cat <<<"x" && npx hyperframes render'
+check "main denies: $c" deny_main "$c"
+check "deny reason names video-maker: $c" reason_has video-maker "$c"
 guard_off() { local o; o=$(main_json pytest | GUARD_MAIN_SESSION_OFF=1 "$GUARD"); [ -z "$o" ]; }
 reason_names_verifier() { main_json pytest | "$GUARD" | jq -e '.hookSpecificOutput.permissionDecisionReason|test("verifier")' >/dev/null; }
 check "GUARD_MAIN_SESSION_OFF=1 disables the hook" guard_off
