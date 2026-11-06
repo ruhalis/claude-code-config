@@ -78,9 +78,8 @@ WebFetch stops at 10 MB and often fails on PDFs. For a datasheet, any PDF, or a 
 
 This section applies to every agent, subagents included.
 
-Never stage, commit or push, even when the user asks: no `git add`, `git commit` (`--amend` included), `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`, and no script that does them for you (anatomy's `publish.mjs --submit`: run it without `--submit`, which prints the commands instead). Read-only git (`status`, `diff`, `log`, `show`, `blame`) is fine. When a change is ready, end with a recommendation instead: the files to commit and the message, as commands the user can run with `!`:
+Never commit or push, even when the user asks: no `git commit` (`--amend` included), `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`, and no script that does them for you (anatomy's `publish.mjs --submit`: run it without `--submit`, which prints the commands instead). Read-only git (`status`, `diff`, `log`, `show`, `blame`) is fine. Staging is allowed: `git add <path>` with explicit paths, and `git restore --staged <path>` to unstage, but never the sweeping forms (`git add -A`, `.`, `-u`, `--all`), which pick up scratch files and secrets. When a change is ready, stage its files yourself, check with `git diff --cached --stat` that only they are staged, then end with the commit as a command the user can run with `!`:
 
-    git add <path> <path>
     git commit -m "<subject>" -m "<body>"
 
-Split unrelated changes into separate commits, leave out generated output, secrets and scratch files, and end the message with the attribution lines Claude Code supplies for commits. This overrides Claude Code's default of committing when asked. Throwaway repos that a script or test creates in a temp directory are exempt.
+Split unrelated changes into separate commits: stage only the first one's files, and give each later commit as its own `git add <path> <path>` plus `git commit` pair for the user to run in order. Leave out generated output, secrets and scratch files, and end the message with the attribution lines Claude Code supplies for commits. This overrides Claude Code's default of committing when asked. Throwaway repos that a script or test creates in a temp directory are exempt.
