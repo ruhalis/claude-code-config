@@ -68,7 +68,7 @@ check "claude CLI installed" command -v claude
 
 echo "-- symlinks from install.sh"
 check "~/.claude/CLAUDE.md -> adapters/claude/CLAUDE.md" linked_to "$CLAUDE_DIR/CLAUDE.md" "$REPO_DIR/adapters/claude/CLAUDE.md"
-for a in Explore deep-reasoner fast-executor verifier; do
+for a in Explore deep-reasoner fast-executor verifier video-maker; do
     check "~/.claude/agents/$a.md -> core/agents" linked_to "$CLAUDE_DIR/agents/$a.md" "$REPO_DIR/core/agents/$a.md"
 done
 for d in "$REPO_DIR"/core/skills/*/; do
@@ -103,15 +103,15 @@ fi
 echo "-- agent frontmatter"
 # bash 3.2 on macOS has no associative arrays
 wm() { case $1 in Explore) echo haiku;; deep-reasoner) echo opus;; *) echo sonnet;; esac; }
-we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; *) echo medium;; esac; }
-for a in Explore deep-reasoner fast-executor verifier; do
+we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; video-maker) echo high;; *) echo medium;; esac; }
+for a in Explore deep-reasoner fast-executor verifier video-maker; do
     f="$REPO_DIR/core/agents/$a.md"
     check "$a: model is $(wm "$a")" test "$(fm "$f" model)" = "$(wm "$a")"
     check "$a: effort is $(we "$a")" test "$(fm "$f" effort)" = "$(we "$a")"
     check "$a: name matches filename" test "$(fm "$f" name)" = "$a"
 done
 posint() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
-for a in fast-executor verifier; do
+for a in fast-executor verifier video-maker; do
     check "$a: maxTurns is a positive integer" posint "$(fm "$REPO_DIR/core/agents/$a.md" maxTurns)"
 done
 check "deep-reasoner has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/deep-reasoner.md'"
@@ -132,12 +132,17 @@ for c in "pytest -q" "uv run python -m pytest" "npm test" "cargo test" "go test 
     "idf.py -C d size" "idf.py size-components" "idf.py -C d app" "ninja" "ninja -C build" "make all" "cargo build"; do
     check "main denies: $c" deny_main "$c"
 done
+reason_has() { main_json "$2" | "$GUARD" | jq -e --arg w "$1" '.hookSpecificOutput.permissionDecisionReason|test($w)' >/dev/null; }
+for c in "npx hyperframes render" "npx -y hyperframes@latest check" "cd /tmp/x && hyperframes snapshot" "pnpm dlx hyperframes preview"; do
+    check "main denies: $c" deny_main "$c"
+    check "deny reason names video-maker: $c" reason_has video-maker "$c"
+done
 for c in 'idf.py -C "/x y" -p "/dev/cu.x" flash' "idf.py -p /dev/cu.x flash" "idf.py -C dir -B build -p port flash" "idf.py --build-dir build flash" \
     "idf.py --build-dir=build flash" "idf.py -C d monitor" "idf.py set-target esp32s3" "idf.py -C d erase-flash" "idf.py -C d app-flash" \
-    "cat pytest.ini" "ls go tests/x" "cat build/log.txt" "ls build" "git status" "make" "echo npm testing" "echo done"; do
+    "grep -r hyperframes ." "ls ~/.claude/plugins/marketplaces/hyperframes" "cat hyperframes/README.md" "cat pytest.ini" "ls go tests/x" "cat build/log.txt" "ls build" "git status" "make" "echo npm testing" "echo done"; do
     check "main allows: $c" pass_main "$c"
 done
-for c in "pytest -q" "idf.py -C dir build" "npm test"; do
+for c in "pytest -q" "idf.py -C dir build" "npm test" "npx hyperframes render"; do
     check "subagent allows: $c" pass_sub "$c"
 done
 guard_off() { local o; o=$(main_json pytest | GUARD_MAIN_SESSION_OFF=1 "$GUARD"); [ -z "$o" ]; }
@@ -148,6 +153,7 @@ guard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/ba
 check "GUARD_MAIN_SESSION_OFF=1 works without jq" guard_off_nojq
 check "missing jq fails closed (exit 1 + message)" guard_nojq_fails
 check "deny reason names the verifier" reason_names_verifier
+check "pytest deny reason names verifier, not video-maker" bash -c "! { $(declare -f main_json); GUARD='$GUARD'; main_json pytest | \"\$GUARD\" | grep -q video-maker; }"
 
 echo "-- instructions and skills"
 lines=$(wc -l < "$REPO_DIR/adapters/claude/CLAUDE.md" | tr -d ' ')

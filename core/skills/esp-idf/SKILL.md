@@ -132,7 +132,7 @@ grep -E '^CONFIG_(SECURE_(BOOT|SIGNED_APPS_NO_SECURE_BOOT|FLASH_ENC_ENABLED)|NVS
 idf.py -C "<dir>" -p "<port>" flash
 ```
 
-`idf.py -C "<dir>" -p "<port>" erase-flash` wipes NVS, the partition table, and any data partitions (models, filesystems, calibration). Run it only after the user has answered an explicit "erase the flash on <board>?" with yes in this conversation. Never chain it "to be safe".
+`idf.py -C "<dir>" -p "<port>" erase-flash` wipes NVS, the partition table, and any data partitions (models, filesystems, calibration). Run it only after the user has answered an explicit "erase the flash on <board>?" with yes in this conversation. Never chain it "to be safe". In auto mode the permission classifier denies `erase-flash` and `esptool.py erase_flash` as irreversible even after that yes; don't retry, rephrase or route around it (no `esptool` variant, no script wrapper). Give the user the exact command to run with `!`, e.g. `! idf.py -C "<dir>" -p "<port>" erase-flash`, wait for its output, then continue with the flash.
 
 If esptool cannot connect: report it, suggest holding **BOOT**, tapping **RESET**, releasing **BOOT** to force download mode, then retry once. Never retry in a loop.
 
