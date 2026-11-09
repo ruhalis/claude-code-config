@@ -2,7 +2,8 @@
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "CADGEN_TELEMETRY": "0",
-    "CADGEN_UPDATE_CHECK": "0"
+    "CADGEN_UPDATE_CHECK": "0",
+    "MCP_TIMEOUT": "90000"
   },
   "enableWorkflows": true,
   "statusLine": {
