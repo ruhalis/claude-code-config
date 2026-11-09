@@ -26,6 +26,7 @@ core/                  source of truth: agents and skills
   skills/*/              SKILL.md skills
   skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
   skills/teach/          personal tutor, quizzes and Artifact lessons (written for Claude Code: uses AskUserQuestion, Agent and Artifact; package-skills.sh still packages it)
+  skills/pcb-author/     the only write path for a board: Zener sources and Diode's pcb CLI, Fable only (Claude Code only; carries Diode's five skills as references, MIT, pinned in SKILL.md)
   skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code, like teach)
 adapters/
   claude/                CLAUDE.md + settings.json + keybindings.json + subagent-statusline.sh + hooks/
@@ -80,7 +81,7 @@ The skills hold workflow and boundaries; project facts live in the project, in `
 | Section | Read by | Keys |
 |---|---|---|
 | `## Boards` | esp-idf | `<board name>: <serial port>` |
-| `## Hardware` | kicad-review, pcb-enclosure, robotics-research-brief | `kicad:`, `pins:` (the firmware pin header), `mcu:`, `fab:`, `note:` |
+| `## Hardware` | kicad-review, pcb-author, pcb-enclosure, robotics-research-brief | `kicad:`, `pins:` (the firmware pin header), `mcu:`, `fab:`, `note:` |
 | `## Print` (optional) | pcb-enclosure | `printer:`, `nozzle:`, `material:`; absent means 0.4 mm nozzle, PLA or PETG |
 | `## Motors` | motor-bench | `rule:`, `rig:`, `program:`, `send:`, `probe:`, `moves:`, `stop:`, `user-only:`, `kill:`, `limits:`, `watchdog:`, `supply:`, `direction:`, `log:` |
 | `## Experiments` | rl-advisor | `log:`, `run-id:`, `runs:`, `metric:`, `eval:`, `framework:` |
