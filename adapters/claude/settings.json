@@ -99,6 +99,17 @@
             "onFailure": "block"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/guard-kicad-edit.sh",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
       }
     ]
   }

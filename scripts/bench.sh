@@ -78,6 +78,9 @@ done
 check "~/.claude/hooks/guard-main-session.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-main-session.sh" "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
+check "~/.claude/hooks/guard-kicad-edit.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+check "KiCad guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+check "KiCad guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
 
 echo "-- settings"
 LIVE_S="$CLAUDE_DIR/settings.json"; REPO_S="$REPO_DIR/adapters/claude/settings.json"
@@ -87,6 +90,8 @@ for f in "$REPO_S" "$LIVE_S"; do
     tag=$([ "$f" = "$REPO_S" ] && echo repo || echo live)
     check "$tag: PreToolUse hook on Bash runs guard-main-session.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-main-session.sh")) | select(.onFailure=="block")' "$f"
+    check "$tag: PreToolUse hook on Edit|Write|Bash runs guard-kicad-edit.sh with onFailure block" \
+        jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
         jq -e '.permissions.deny as $d | ["Bash(git commit *)","Bash(git push *)","Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"
@@ -172,7 +177,68 @@ check "missing jq fails closed (exit 1 + message)" guard_nojq_fails
 check "deny reason names the verifier" reason_names_verifier
 check "pytest deny reason names verifier, not video-maker" bash -c "! { $(declare -f main_json); GUARD='$GUARD'; main_json pytest | \"\$GUARD\" | grep -q video-maker; }"
 
+echo "-- KiCad guard hook on synthetic input"
+KGUARD="$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+KT=$(mktemp -d)
+# A session transcript per model, plus subagent transcripts under <session>/subagents/.
+for m in fable-5-2 opus-5-5 sonnet-5-5; do
+    jq -nc '{type:"user",message:{role:"user"}}' > "$KT/${m%%-*}.jsonl"
+    jq -nc --arg m "claude-$m" '{type:"assistant",message:{model:$m}}' >> "$KT/${m%%-*}.jsonl"
+done
+jq -nc '{type:"user",message:{role:"user"}}' > "$KT/empty.jsonl"
+mkdir -p "$KT/opus/subagents" "$KT/fable/subagents"
+jq -nc '{type:"assistant",message:{model:"claude-fable-5-2"}}' > "$KT/opus/subagents/agent-fab1.jsonl"
+jq -nc '{type:"assistant",message:{model:"claude-sonnet-5-5"}}' > "$KT/fable/subagents/agent-son1.jsonl"
+jq -nc '{type:"user",message:{role:"user"}}' > "$KT/fable/subagents/agent-new1.jsonl"
+# k_json <session> <tool> <file_path or command> [agent_id]
+k_json() { jq -n --arg t "$KT/$1.jsonl" --arg tool "$2" --arg v "$3" --arg a "${4:-}" \
+    '{transcript_path:$t,tool_name:$tool,tool_input:(if $tool=="Bash" then {command:$v} else {file_path:$v} end)} + (if $a=="" then {} else {agent_id:$a} end)'; }
+k_deny() { k_json "$@" | "$KGUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
+k_pass() { local o; o=$(k_json "$@" | "$KGUARD"); [ -z "$o" ]; }
+k_reason() { local w="$1"; shift; k_json "$@" | "$KGUARD" | jq -e --arg w "$w" '.hookSpecificOutput.permissionDecisionReason|test($w)' >/dev/null; }
+for p in board.kicad_pcb "/x/my board/a.kicad_sch" a.kicad_pro lib.kicad_sym fp.pretty/r.kicad_mod sheet.kicad_wks rules.kicad_dru Board.zen; do
+    check "opus Edit denied: $p" k_deny opus Edit "$p"
+    check "sonnet Write denied: $p" k_deny sonnet Write "$p"
+    check "fable Edit allowed: $p" k_pass fable Edit "$p"
+    check "fable Write allowed: $p" k_pass fable Write "$p"
+done
+for p in README.md notes.kicad_pcb.md pcb.toml review/drc.json a.kicad_prl zen.md src/main.c; do
+    check "opus Edit allowed: $p" k_pass opus Edit "$p"
+done
+check "opus Read of a board is not guarded" k_pass opus Read board.kicad_pcb
+for c in 'sed -i "" "s/a/b/" board.kicad_pcb' 'sed -E -i.bak s/a/b/ "my board.kicad_sch"' "perl -pi -e 's/a/b/' x.kicad_sch" 'echo x > Board.zen' \
+    $'cat >> a.kicad_sch <<EOF\n(x)\nEOF' 'printf x | tee a.kicad_pro' 'pcb layout --no-open Board.zen' 'cd b && pcb import x.kicad_pro .' \
+    'pcb apply schematic --no-open B.zen' 'pcb new board X https://example.com/x' 'pcb fmt' 'pcb fix B.zen' 'pcb migrate .' 'pcb route --engine freerouting B.zen' \
+    '~/.local/bin/pcb layout B.zen' 'KICAD_CLI=/x pcb layout B.zen' 'pcb +nightly layout B.zen' 'pcb build B.zen; pcb layout B.zen' \
+    'pcb-component-gen x' 'kicad-cli sch upgrade a.kicad_sch' '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli pcb upgrade b.kicad_pcb'; do
+    check "opus Bash denied: $c" k_deny opus Bash "$c"
+    check "fable Bash allowed: $c" k_pass fable Bash "$c"
+done
+for c in 'pcb build Board.zen' 'pcb layout --check Board.zen' 'pcb bom --offline Board.zen' 'pcb help layout' 'pcb help fix' 'pcb --version' 'pcb sim tb.zen' 'pcb dfm B.zen' \
+    'kicad-cli pcb drc --format json -o review/drc.json b.kicad_pcb' 'kicad-cli sch export netlist a.kicad_sch > review/a.net' \
+    'kicad-cli pcb export svg b.kicad_pcb >b.kicad_pcb.log 2>&1' 'grep -n "(net " b.kicad_pcb' 'sed -n "1,20p" a.kicad_sch' \
+    "perl -ne 'print if /net/' a.kicad_sch" 'cat Board.zen' 'git diff -- b.kicad_pcb' 'cp -R board board-copy' 'git status' 'ls eda/'; do
+    check "opus Bash allowed: $c" k_pass opus Bash "$c"
+done
+check "Fable subagent under an Opus session may edit" k_pass opus Edit Board.zen fab1
+check "Fable subagent under an Opus session may run pcb layout" k_pass opus Bash "pcb layout --no-open B.zen" fab1
+check "Sonnet subagent under a Fable session is denied" k_deny fable Edit board.kicad_pcb son1
+check "subagent with no model on record is denied" k_deny fable Edit board.kicad_pcb new1
+check "that denial says to read first" k_reason "read call first" fable Edit board.kicad_pcb new1
+check "subagent with no transcript file is denied" k_deny fable Edit board.kicad_pcb gone1
+check "main session with no assistant message is denied" k_deny empty Edit board.kicad_pcb
+check "missing transcript is denied" k_deny nosuch Edit board.kicad_pcb
+check "deny reason names the model" k_reason "claude-opus-5-5" opus Edit board.kicad_pcb
+check "deny reason names pcb-author" k_reason "pcb-author" opus Edit board.kicad_pcb
+kguard_off() { local o; o=$(k_json opus Edit board.kicad_pcb | GUARD_KICAD_OFF=1 "$KGUARD"); [ -z "$o" ]; }
+kguard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/bash "$KGUARD" 2>&1 >/dev/null); rc=$?; [ "$rc" -eq 1 ] && printf '%s' "$e" | grep -q "install jq"; }
+check "GUARD_KICAD_OFF=1 disables the hook" kguard_off
+check "KiCad guard: missing jq fails closed (exit 1 + message)" kguard_nojq_fails
+check "KiCad guard: empty input is no decision" bash -c "o=\$(printf '{}' | '$KGUARD'); [ -z \"\$o\" ]"
+rm -rf "$KT"
+
 echo "-- instructions and skills"
+check "CLAUDE.md names the KiCad guard hook" grep -q "guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/CLAUDE.md"
 lines=$(wc -l < "$REPO_DIR/adapters/claude/CLAUDE.md" | tr -d ' ')
 check "CLAUDE.md under 200 lines (is $lines)" test "$lines" -lt 200
 check "CLAUDE.md names the guard hook" grep -q "guard-main-session.sh" "$REPO_DIR/adapters/claude/CLAUDE.md"
