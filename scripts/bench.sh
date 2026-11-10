@@ -90,8 +90,8 @@ for f in "$REPO_S" "$LIVE_S"; do
     tag=$([ "$f" = "$REPO_S" ] && echo repo || echo live)
     check "$tag: PreToolUse hook on Bash runs guard-main-session.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-main-session.sh")) | select(.onFailure=="block")' "$f"
-    check "$tag: PreToolUse hook on Edit|Write|Bash runs guard-kicad-edit.sh with onFailure block" \
-        jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
+    check "$tag: PreToolUse hook on Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].* runs guard-kicad-edit.sh with onFailure block" \
+        jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
         jq -e '.permissions.deny as $d | ["Bash(git commit *)","Bash(git push *)","Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"

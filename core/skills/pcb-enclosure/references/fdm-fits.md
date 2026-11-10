@@ -1,6 +1,6 @@
 # FDM fit values
 
-Starting values, to be calibrated with one test coupon print. Values are for a 0.4 mm nozzle, PLA or PETG. dfam-check does not cover fits; these do.
+Starting values, to be calibrated with one test coupon print. Values are for a 0.4 mm nozzle, PLA or PETG. text-to-cad's printing check (`cad model dfm --process printing`) measures walls and overhangs only, not fits or hole diameters; these values and `scripts/fit_check.py` do.
 
 Calibrated on: ______________________ (printer, nozzle, material, date)
 
@@ -34,5 +34,22 @@ Print it flat, measure or try the fits, then overwrite the values below.
 | Standoff height above PCB bottom | - | tallest bottom component + 1 mm | |
 | Minimum wall | - | 1.6 (4 perimeters), 1.2 thin | |
 | Minimum feature | - | 0.8 | |
+| Minimum hole | - | 2.0 | text-to-cad's FDM limit, not measured by its dfm; the 1.8 M2 pilot sits under it, so prove it on the coupon |
 | Horizontal-axis hole compensation | hole dia. | +0.2 mm or teardrop | holes printed with axis along X/Y sag |
 | Bottom edge chamfer | - | 0.5 | elephant foot |
+
+## Check thresholds
+
+Single values `scripts/fit_check.py` asserts, from the table above. The check measures the B-rep, never a mesh.
+
+| Check | Limit | From |
+|---|---|---|
+| Mounting-hole centre, part vs `board.step` (and `positions.csv` rows) | <= 0.05 mm | |
+| Part hole diameter at a mount | table value +/- 0.01 | clearance, insert or pilot row |
+| Connector body to part | >= 0.5 mm | low end of connector cutout clearance |
+| PCB pocket gap, board edge to walls at board height | >= 0.5 mm per side | PCB pocket clearance |
+| Part overlap with board or connectors | 0 mm3 | |
+
+## Mesh export tolerance
+
+STL and 3MF for printing: `--tolerance 0.02` (mm), about a tenth of the smallest clearance above (the +0.2 press fit). The default viewer mesh can sit up to 0.2 mm inside a curved surface, as much as a clearance. Lower it if a tighter fit is added; stay at or above 0.001. STEP takes no tolerance.

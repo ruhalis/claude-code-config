@@ -1,9 +1,8 @@
 {
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
-    "CADGEN_TELEMETRY": "0",
-    "CADGEN_UPDATE_CHECK": "0",
-    "MCP_TIMEOUT": "90000"
+    "MCP_TIMEOUT": "90000",
+    "CAD_TELEMETRY": "0"
   },
   "enableWorkflows": true,
   "statusLine": {
@@ -15,21 +14,15 @@
     "frontend-design@claude-plugins-official": true,
     "hyperframes@hyperframes": true,
     "kicad-happy@kicad-happy": true,
-    "text-to-cad@earthtojake": true
+    "text-to-cad@text-to-cad": true
   },
   "extraKnownMarketplaces": {
     "kicad-happy": {
       "source": {
         "source": "github",
         "repo": "aklofas/kicad-happy"
-      }
-    },
-    "earthtojake": {
-      "source": {
-        "source": "github",
-        "repo": "earthtojake/text-to-cad",
-        "ref": "latest"
-      }
+      },
+      "autoUpdate": true
     },
     "hyperframes": {
       "source": {
@@ -41,7 +34,6 @@
   "syncClaudeAiPlugins": false,
   "syncClaudeAiSkills": false,
   "advisorModel": "fable",
-  "effortLevel": "xhigh",
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "high"
@@ -84,7 +76,9 @@
       "Bash(rm -rf ~ *)",
       "Bash(rm -rf / *)",
       "Bash(rm -rf ~)",
-      "Bash(rm -rf /)"
+      "Bash(rm -rf /)",
+      "Skill(text-to-cad:pcb)",
+      "Skill(text-to-cad:pcb *)"
     ]
   },
   "hooks": {
@@ -101,7 +95,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*",
         "hooks": [
           {
             "type": "command",
