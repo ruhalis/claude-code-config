@@ -45,7 +45,7 @@ Diode's own agent skills, copied verbatim from `github.com/diodeinc/pcb` at `c7f
 
 ## Orchestration
 
-Authoring rounds are design iteration: the agent that writes the board also runs `pcb build`, `pcb layout` and the review exports and looks at the result. That is the main session when it is on Fable, a fork of it, or `general-purpose` launched with `model: "fable"` and `effort: "high"` (pass it on the call: a Fable subagent under a session on another model does not take the session's level, and Fable 5.2's Claude Code default is `medium`). `fast-executor`, `verifier`, `deep-reasoner` and `Explore` are on other models, so the hook denies their writes; `verifier` can still run the read-only checks (`pcb layout --check`, kicad-review's `erc_drc.sh`) at a milestone.
+Authoring rounds are design iteration: the agent that writes the board also runs `pcb build`, `pcb layout` and the review exports and looks at the result. That is the main session when it is on Fable, a fork of it, or `general-purpose` launched with `model: "fable"` and `effort: "high"` (pass it on the call: a Fable subagent under a session on another model does not take the session's level, and Fable 5.2's Claude Code default is `medium`). `fast-executor`, `implementer`, `verifier`, `deep-reasoner` and `Explore` are on other models, so the hook denies their writes; `verifier` can still run the read-only checks (`pcb layout --check`, kicad-review's `erc_drc.sh`) at a milestone.
 
 ## Not yet verified on this machine
 

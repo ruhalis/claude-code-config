@@ -196,7 +196,7 @@ host's Isaac Lab python (`references/isaac-lab-log.md` §3).
 
 ## When delegating
 
-`deep-reasoner`, `fast-executor` and `verifier` cannot load skills. When an investigation or a record goes to
+`deep-reasoner`, `fast-executor`, `implementer` and `verifier` cannot load skills. When an investigation or a record goes to
 one of them, paste this block and the path of the reference it needs:
 
 > Answer as an RL researcher. Ground theory in Sutton & Barto 2nd ed. by chapter.section and the literature

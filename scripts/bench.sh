@@ -68,7 +68,7 @@ check "claude CLI installed" command -v claude
 
 echo "-- symlinks from install.sh"
 check "~/.claude/CLAUDE.md -> adapters/claude/CLAUDE.md" linked_to "$CLAUDE_DIR/CLAUDE.md" "$REPO_DIR/adapters/claude/CLAUDE.md"
-for a in Explore deep-reasoner fast-executor verifier video-maker; do
+for a in Explore deep-reasoner fast-executor implementer verifier video-maker; do
     check "~/.claude/agents/$a.md -> core/agents" linked_to "$CLAUDE_DIR/agents/$a.md" "$REPO_DIR/core/agents/$a.md"
 done
 for d in "$REPO_DIR"/core/skills/*/; do
@@ -107,16 +107,16 @@ fi
 
 echo "-- agent frontmatter"
 # bash 3.2 on macOS has no associative arrays
-wm() { case $1 in Explore) echo haiku;; deep-reasoner) echo opus;; *) echo sonnet;; esac; }
-we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; video-maker) echo high;; *) echo medium;; esac; }
-for a in Explore deep-reasoner fast-executor verifier video-maker; do
+wm() { case $1 in Explore) echo haiku;; deep-reasoner|implementer) echo opus;; *) echo sonnet;; esac; }
+we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; implementer|video-maker) echo high;; *) echo medium;; esac; }
+for a in Explore deep-reasoner fast-executor implementer verifier video-maker; do
     f="$REPO_DIR/core/agents/$a.md"
     check "$a: model is $(wm "$a")" test "$(fm "$f" model)" = "$(wm "$a")"
     check "$a: effort is $(we "$a")" test "$(fm "$f" effort)" = "$(we "$a")"
     check "$a: name matches filename" test "$(fm "$f" name)" = "$a"
 done
 posint() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
-for a in fast-executor verifier video-maker; do
+for a in fast-executor implementer verifier video-maker; do
     check "$a: maxTurns is a positive integer" posint "$(fm "$REPO_DIR/core/agents/$a.md" maxTurns)"
 done
 check "deep-reasoner has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/deep-reasoner.md'"
