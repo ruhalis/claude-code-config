@@ -7,6 +7,12 @@
 #                               several minutes; needs `claude` logged in)
 #   scripts/bench.sh --live --only L2,L5   run a subset of the live cases
 #   scripts/bench.sh --keep     keep the live scratch dir for inspection
+#   BENCH_GUARD=<file> BENCH_KGUARD=<file> scripts/bench.sh
+#                               run the synthetic hook cases against candidate
+#                               copies of the two guard hooks. The live hooks are
+#                               symlinks into this repo, so an edit in place is
+#                               live at once and a broken one blocks every call:
+#                               test a copy this way first, then copy it over.
 #
 # Static (S*): symlinks point into this repo, live settings carry the hook, the
 # deny list, the cache TTL and the subagent env; agent frontmatter pins the
@@ -94,6 +100,10 @@ for f in "$REPO_S" "$LIVE_S"; do
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
         jq -e '.permissions.deny as $d | ["Bash(git commit *)","Bash(git push *)","Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
+    check "$tag: permissions.deny covers merge, rebase, cherry-pick, revert, tag and the sweeping git add forms" \
+        jq -e '.permissions.deny as $d | ["Bash(git merge *)","Bash(git rebase *)","Bash(git cherry-pick *)","Bash(git revert *)","Bash(git tag *)","Bash(git add -A *)","Bash(git add --all *)","Bash(git add -u *)","Bash(git add --update *)","Bash(git add .)","Bash(git add . *)"] | all(. as $r | $d | index($r) != null)' "$f"
+    check "$tag: permissions.ask covers the rea MCP tools" jq -e '(.permissions.ask // []) | index("mcp__plugin_rea_rea__*") != null' "$f"
+    check "$tag: the rea marketplace is pinned to a full commit SHA" jq -e '(.extraKnownMarketplaces.rea.source.ref // "") | test("^[0-9a-f]{40}$")' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"
     check "$tag: env.CLAUDE_CODE_SUBAGENT_MODEL is sonnet" jq -e '.env.CLAUDE_CODE_SUBAGENT_MODEL=="sonnet"' "$f"
     check "$tag: CLAUDE_CODE_SUBAGENT_MODEL_FORCE is not set (it would override the pins)" \
@@ -125,7 +135,8 @@ check "Explore has omitClaudeMd: true (our override is a custom agent; without i
 check "Explore has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/Explore.md'"
 
 echo "-- guard hook on synthetic input"
-GUARD="$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
+GUARD="${BENCH_GUARD:-$REPO_DIR/adapters/claude/hooks/guard-main-session.sh}"
+[ -z "${BENCH_GUARD:-}" ] || printf '  NOTE  testing a candidate main-session guard: %s\n' "$GUARD"
 main_json() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}'; }
 sub_json()  { jq -n --arg c "$1" '{agent_id:"abc",agent_type:"verifier",tool_name:"Bash",tool_input:{command:$c}}'; }
 deny_main() { main_json "$1" | "$GUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
@@ -167,6 +178,19 @@ done
 c='cat <<<"x" && npx hyperframes render'
 check "main denies: $c" deny_main "$c"
 check "deny reason names video-maker: $c" reason_has video-maker "$c"
+# a separator, an argument, a path prefix or a subshell next to the runner (allowed until 2026-11-16),
+# and the keyword and wrapper shapes the loose match has always caught
+for c in 'pytest; echo done' 'pytest|tail -5' 'pytest&&echo ok' 'pytest >out.txt 2>&1' 'idf.py build; echo $?' 'idf.py build|tail' 'make test;' 'cargo test|tail' 'ctest;' \
+    'npm test -- --watch' 'npm test foo' 'bun test src/' 'pnpm test --filter x' '.venv/bin/pytest -q' '/usr/local/bin/ninja -C build' '(pytest)' 'x=$(pytest)' 'if true; then pytest; fi' \
+    'if pytest -q; then echo ok; fi' '! pytest' '{ pytest; }' 'sudo pytest' 'ssh host pytest' 'poetry run pytest' 'python -m coverage run -m pytest' 'caffeinate -i idf.py build' \
+    'env X=1 pytest' 'timeout 600 pytest' 'cat x | xargs pytest' 'echo start && idf.py build' 'for f in a b; do pytest $f; done' 'npx hyperframes render; echo done'; do
+    check "main denies: $c" deny_main "$c"
+done
+# a segment whose command only names or reads things can't start a run
+for c in 'uv add --dev pytest' 'pip show pytest' 'which pytest' 'grep -rn pytest .' 'echo run pytest later' 'man ninja' 'brew install ninja' 'command -v ctest' 'ls .venv/bin/pytest' \
+    'git log --grep pytest' 'which pytest || uv add --dev pytest' 'make flash' 'idf.py flash' 'npm run build'; do
+    check "main allows: $c" pass_main "$c"
+done
 guard_off() { local o; o=$(main_json pytest | GUARD_MAIN_SESSION_OFF=1 "$GUARD"); [ -z "$o" ]; }
 reason_names_verifier() { main_json pytest | "$GUARD" | jq -e '.hookSpecificOutput.permissionDecisionReason|test("verifier")' >/dev/null; }
 check "GUARD_MAIN_SESSION_OFF=1 disables the hook" guard_off
@@ -178,7 +202,8 @@ check "deny reason names the verifier" reason_names_verifier
 check "pytest deny reason names verifier, not video-maker" bash -c "! { $(declare -f main_json); GUARD='$GUARD'; main_json pytest | \"\$GUARD\" | grep -q video-maker; }"
 
 echo "-- KiCad guard hook on synthetic input"
-KGUARD="$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+KGUARD="${BENCH_KGUARD:-$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh}"
+[ -z "${BENCH_KGUARD:-}" ] || printf '  NOTE  testing a candidate KiCad guard: %s\n' "$KGUARD"
 KT=$(mktemp -d)
 # A session transcript per model, plus subagent transcripts under <session>/subagents/.
 for m in fable-5-2 opus-5-5 sonnet-5-5; do
@@ -218,6 +243,19 @@ for c in 'pcb build Board.zen' 'pcb layout --check Board.zen' 'pcb bom --offline
     'kicad-cli pcb drc --format json -o review/drc.json b.kicad_pcb' 'kicad-cli sch export netlist a.kicad_sch > review/a.net' \
     'kicad-cli pcb export svg b.kicad_pcb >b.kicad_pcb.log 2>&1' 'grep -n "(net " b.kicad_pcb' 'sed -n "1,20p" a.kicad_sch' \
     "perl -ne 'print if /net/' a.kicad_sch" 'cat Board.zen' 'git diff -- b.kicad_pcb' 'cp -R board board-copy' 'git status' 'ls eda/'; do
+    check "opus Bash allowed: $c" k_pass opus Bash "$c"
+done
+# kicad-happy's bom scripts rewrite symbol properties in the schematic unless --dry-run is given
+for c in 'python3 /p/skills/bom/scripts/edit_properties.py hardware/b/b.kicad_sch --updates u.json' \
+    'python3 "$CLAUDE_PLUGIN_ROOT/skills/bom/scripts/sync_datasheet_urls.py" hardware/b/b.kicad_sch --overwrite' \
+    'cd hw && uv run /p/edit_properties.py b.kicad_sch --updates u.json' 'cat u.json; python3 sync_datasheet_urls.py b.kicad_sch'; do
+    check "opus Bash denied: $c" k_deny opus Bash "$c"
+    check "fable Bash allowed: $c" k_pass fable Bash "$c"
+done
+check "that denial names the bom script" k_reason "bom script" opus Bash 'python3 /p/edit_properties.py b.kicad_sch --updates u.json'
+for c in 'python3 /p/skills/bom/scripts/edit_properties.py b.kicad_sch --updates u.json --dry-run' 'python3 /p/sync_datasheet_urls.py b.kicad_sch --dry-run' \
+    'python3 /p/skills/bom/scripts/sync_datasheet_urls.py --help' 'cat /p/skills/bom/scripts/edit_properties.py' 'grep -n argparse /p/skills/bom/scripts/sync_datasheet_urls.py' \
+    'ls /p/skills/bom/scripts/' 'python3 /p/skills/bom/scripts/bom_manager.py export b.kicad_sch'; do
     check "opus Bash allowed: $c" k_pass opus Bash "$c"
 done
 check "Fable subagent under an Opus session may edit" k_pass opus Edit Board.zen fab1

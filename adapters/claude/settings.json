@@ -41,7 +41,8 @@
     "rea": {
       "source": {
         "source": "github",
-        "repo": "morluto/rea"
+        "repo": "morluto/rea",
+        "ref": "5d1a47768aa0ff43077758db57f9e99e9f3034a9"
       }
     }
   },
@@ -77,6 +78,17 @@
       "Bash(git push)",
       "Bash(git -C * push *)",
       "Bash(gh pr create *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git cherry-pick *)",
+      "Bash(git revert *)",
+      "Bash(git tag *)",
+      "Bash(git add -A *)",
+      "Bash(git add --all *)",
+      "Bash(git add -u *)",
+      "Bash(git add --update *)",
+      "Bash(git add .)",
+      "Bash(git add . *)",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(git push --force-with-lease *)",
@@ -94,6 +106,9 @@
       "Bash(rm -rf /)",
       "Skill(text-to-cad:pcb)",
       "Skill(text-to-cad:pcb *)"
+    ],
+    "ask": [
+      "mcp__plugin_rea_rea__*"
     ]
   },
   "hooks": {

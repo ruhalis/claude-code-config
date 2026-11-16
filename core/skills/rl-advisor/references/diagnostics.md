@@ -75,7 +75,8 @@ infrastructure · 9 Questions to ask before proposing a lever
 - **Seeds**: ≥ 3 per arm to say "better", ≥ 5 to size an effect; with 2 the honest verdict is
   "inconclusive". This section is the one home of the keep/discard rule that SKILL.md's Rules cite.
   `compare_arms.py compare --a … --b …` prints the bootstrap CI, Welch t, IQM and P(b > a); `--paired`
-  when arms share seeds/frames.
+  when arms share seeds/frames. The Welch 95 % CI (paired t with `--paired`, i.e. p < 0.05) decides "clears the
+  noise"; the percentile bootstrap CI is secondary, too narrow on 3–10 seeds (`compare_arms.py selftest`).
 - **Best-of-N inflation**: `compare_arms.py max-of-n N --sd σ`; the max of 10 draws sits ≈ +1.5 sd above
   their mean, of 20 ≈ +1.9 sd (aquila's shipped single epoch was a +2.4 sd draw, EVIDENCE §6.6). Subtract it
   from any "best checkpoint" claim; compare picks against picks made the same way, or re-evaluate the pick on

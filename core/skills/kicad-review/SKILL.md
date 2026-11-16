@@ -47,7 +47,7 @@ kicad-happy is an optional Claude Code plugin (github.com/aklofas/kicad-happy, M
 - Its `kicad` analyzers are optional extra evidence in steps 3 and 6. Call them by absolute path, as in the block below, and do not load kicad-happy's SKILL.md: its review contract is not this procedure. Output goes to `review/kicad-happy/`, never an `analysis/` directory. Merge their findings into the same table with source `kh`, re-verified like any other row.
 - `spice` and `emc` run only when the user asks.
 - `lcsc`, `jlcpcb` and `datasheets` are for read-only lookups (stock, basic/extended status, datasheet fetch) and jlcpcb's rotation-offset table.
-- Never run `bom/edit_properties.py`, `sync_datasheet_urls.py`, or anything with `--write`, `--apply` or `--overwrite`. Their proposals go to the user as GUI edits.
+- Never run `bom/edit_properties.py` or `bom/sync_datasheet_urls.py` without `--dry-run`: both rewrite the schematic by default, and the KiCad guard hook denies them for every model but Fable. Never run anything with `--write`, `--apply` or `--overwrite` either. Their proposals go to the user as GUI edits.
 - Plugin absent or disabled: skip it. Nothing else changes.
 
 ```bash

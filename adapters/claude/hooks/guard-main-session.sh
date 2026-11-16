@@ -38,15 +38,20 @@ scan=$(printf '%s\n' "$cmd" | awk -v q="'" '
     }
   }' | sed -E "s/'[^']*'/''/g; s/\"[^\"]*\"/\"\"/g")
 
+# Segments (split on ; & |) whose command only names or reads things can't start a test or a build:
+# "grep pytest", "uv add --dev pytest", "which pytest", "git commit -m fix pytest flake". Drop them before matching.
+benign='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(e?grep|fgrep|rg|ag|echo|printf|cat|bat|less|head|tail|wc|ls|which|type|man|brew|git|gh|pip3?|uv[[:space:]]+(add|remove|pip|tree|lock|sync)|jq|sed|awk|cp|mv|mkdir|touch|open|code|curl|command[[:space:]]+-v)([[:space:]]|$)'
+scan=$(printf '%s\n' "$scan" | tr ';&|' '\n\n\n' | grep -vE "$benign")
 # One regex per guarded shape; word-bounded so "pytest.ini" or "go tests/" don't match.
-pattern='(^|[;&|[:space:]])(pytest|py\.test|(python3?|uv run|uvx)[[:space:]]+(-m[[:space:]]+)?pytest|(npm|pnpm|yarn|bun)[[:space:]]+(run[[:space:]]+)?test([[:space:]]|$)|cargo[[:space:]]+(test|build)|go[[:space:]]+test|ctest|ninja|make[[:space:]]+(test|check|all)|cmake[[:space:]]+--build)([[:space:]]|$)'
+end='([[:space:];&|)<>]|$)'
+pattern='(^|[;&|(/[:space:]])(pytest|py\.test|(python3?|uv run|uvx)[[:space:]]+(-m[[:space:]]+)?pytest|(npm|pnpm|yarn|bun)[[:space:]]+(run[[:space:]]+)?test|cargo[[:space:]]+(test|build)|go[[:space:]]+test|ctest|ninja|make[[:space:]]+(test|check|all)|cmake[[:space:]]+--build)'"$end"
 # idf.py: drop value-taking options first so "-B build" is not read as the build action.
 opts='-C|-B|-G|-p|-b|-D|--project-dir|--build-dir|--port|--baud|--generator|--define-cache-entry'
 stripped=$(printf '%s' "$scan" | sed -E "s/(^|[[:space:]])($opts)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:];&|]+)/\1/g")
-idf='idf\.py([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(build|app|bootloader|size|size-components|size-files)([[:space:]]|$)'
+idf='idf\.py([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(build|app|bootloader|size|size-components|size-files)'"$end"
 # HyperFrames CLI in command position (start, or after ; & |), bare or through npx/bunx/pnpx/pnpm dlx/npm exec.
 # Command position only, so "grep hyperframes" or a path containing the word passes.
-hf='(^|[;&|])[[:space:]]*((npx|bunx|pnpx)([[:space:]]+(-y|--yes))*[[:space:]]+|pnpm[[:space:]]+dlx[[:space:]]+|npm[[:space:]]+exec[[:space:]]+(--[[:space:]]+)?)?hyperframes(@[^[:space:]]*)?([[:space:]]|$)'
+hf='(^|[;&|])[[:space:]]*((npx|bunx|pnpx)([[:space:]]+(-y|--yes))*[[:space:]]+|pnpm[[:space:]]+dlx[[:space:]]+|npm[[:space:]]+exec[[:space:]]+(--[[:space:]]+)?)?hyperframes(@[^[:space:]]*)?([[:space:];&|)<>]|$)'
 if printf '%s' "$scan" | grep -qE "$hf"; then
   jq -n --arg reason "Blocked in the main session: HyperFrames video work (check, snapshot, preview, render) goes to the video-maker subagent (Agent tool, subagent_type \"video-maker\"), per CLAUDE.md. Subagents may run this command." \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'

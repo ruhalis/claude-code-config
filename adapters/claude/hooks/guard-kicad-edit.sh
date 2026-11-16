@@ -12,7 +12,10 @@
 # `pcb-component-gen`; `kicad-cli <sch|pcb|sym|fp> upgrade` (also under
 # `cad run`); text-to-cad's board edit API (kicad_pcb.edit / kicad_sch.edit),
 # inline in the command or in any existing *.py file the command names (as in
-# `cad run board.py`); and KiCad MCP tools whose names say they write (create,
+# `cad run board.py`); kicad-happy's two bom scripts that rewrite symbol
+# properties in a schematic (edit_properties.py, sync_datasheet_urls.py; a
+# segment with --dry-run or --help, or one that only reads the script, passes);
+# and KiCad MCP tools whose names say they write (create,
 # add, edit, update, set, delete, remove, move, place, route, save, import ...).
 # Best effort on Bash: a script that writes the files some other way is not seen.
 #
@@ -52,6 +55,10 @@ case "$tool" in
     lead='^[[:space:]$(]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
     pcbcli="${lead}pcb([[:space:]]+\\+[A-Za-z0-9._-]+)?[[:space:]]+(layout|import|apply|new|fmt|fix|migrate|route|embed-step)([[:space:]]|\$)"
     gen="${lead}pcb-component-gen([[:space:]]|\$)"
+    # kicad-happy's bom scripts write symbol properties into the .kicad_sch by default.
+    bomwrite="(^|[/[:space:]\"'])(edit_properties|sync_datasheet_urls)\\.py([\"'[:space:]]|\$)"
+    bomread='^[[:space:]]*(cat|bat|less|head|tail|wc|ls|e?grep|fgrep|rg|file|stat)([[:space:]]|$)'
+    bomdry='(^|[[:space:]])(--dry-run|--help|-h)([[:space:]]|$)'
     segments=$(printf '%s\n' "$cmd" | tr ';&|' '\n\n\n')
     # text-to-cad's board edit API, inline or inside a named script (relative paths against the call's cwd).
     editapi='kicad_(pcb|sch)\.edit[[:space:]]*\('
@@ -69,6 +76,8 @@ case "$tool" in
       what="a pcb command that writes the board (layout, import, apply, new, fmt, fix, migrate, route, embed-step)"
     elif printf '%s\n' "$segments" | grep -qE "$gen"; then
       what="pcb-component-gen (writes a symbol and a footprint)"
+    elif printf '%s\n' "$segments" | grep -E "$bomwrite" | grep -vE "$bomread" | grep -qvE -- "$bomdry"; then
+      what="a kicad-happy bom script that rewrites symbol properties in the schematic (edit_properties.py, sync_datasheet_urls.py; --dry-run only previews)"
     elif printf '%s' "$cmd" | grep -qE "$editapi"; then
       what="text-to-cad's board edit API (kicad_pcb.edit / kicad_sch.edit)"
     elif [ -n "$pyedit" ]; then
