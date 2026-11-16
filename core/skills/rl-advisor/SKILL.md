@@ -1,6 +1,6 @@
 ---
 name: rl-advisor
-description: "RL and imitation-learning advisor and lab notebook, grounded in Sutton and Barto (2nd ed.) and the deep-RL / robot-learning literature, with aquila's SAC-teachers → DAgger-GRU-student pipeline as the worked reference. Use whenever the user asks why a run behaves as it does (plateau, collapse, action chatter, Q overestimation, works-in-sim-only), what a term or algorithm means or which to pick (TD, GAE, deadly triad, SAC, PPO, DAgger, BPTT), how to set gamma, replay, a reward, observation, DR or curriculum, or whether a result is real (seeds, CIs, best-of-N picks); and whenever they start, stop, sweep, compare or finish a training run, ask what was tried before or which run was best, are about to change a lever, reward term or hyperparameter, or mention a run log, decision ledger or ledger row, run manifest, gate file, TensorBoard/W&B run or sim-to-real test - even when they don't say 'RL'. Not for writing env code (isaac) or comparing papers (robotics-research-brief)."
+description: "RL and imitation-learning advisor and lab notebook, grounded in Sutton and Barto (2nd ed.) and the deep-RL / robot-learning literature, with aquila's SAC-teachers → DAgger-GRU-student pipeline as the worked reference. Use whenever the user asks why a run behaves as it does (plateau, collapse, action chatter, Q overestimation, works-in-sim-only), what a term or algorithm means or which to pick (TD, GAE, deadly triad, SAC, PPO, DAgger, BPTT), how to set gamma, replay, a reward, observation, DR or curriculum, or whether a result is real (seeds, CIs, best-of-N picks); and whenever they start, stop, sweep, compare or finish a training run, ask what was tried before or which run was best, are about to change a lever, reward term or hyperparameter, or mention a run log, decision ledger or ledger row, run manifest, gate file, TensorBoard/W&B run or sim-to-real test - even when they don't say 'RL'. Not for writing env code (isaac)."
 ---
 
 # RL advisor
@@ -221,7 +221,7 @@ one of them, paste this block and the path of the reference it needs:
   the box each hold runs the other may not): read them over ssh or ask for the manifest, the gate file and
   `git -C <repo> rev-parse --short HEAD && git -C <repo> status --porcelain` from the host. Without the host's
   sha write `Code: unknown (local <sha>)`.
-- A paper or figure you cannot open: "(unverified)", as in robotics-research-brief; never invent a number.
+- A paper or figure you cannot open: "(unverified)"; never invent a number.
 - A document the record cites is gone from the checkout (aquila's `PLAN.md`, removed in f0d12c7): read it from
   history (`git log --oneline -- <file>`, then `git show <commit>^:<file>`) and say which revision you read.
 - The user wants the run started: state the command, the GPU-hours and the gate, and leave the launch to them

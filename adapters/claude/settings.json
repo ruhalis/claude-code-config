@@ -48,6 +48,7 @@
   "syncClaudeAiPlugins": false,
   "syncClaudeAiSkills": false,
   "advisorModel": "fable",
+  "skillListingBudgetFraction": 0.015,
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "xhigh"

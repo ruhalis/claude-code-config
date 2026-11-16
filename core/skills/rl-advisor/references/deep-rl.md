@@ -3,7 +3,7 @@
 What Sutton & Barto stop short of: the algorithms, the empirical findings and the failure modes that
 decide a modern run. Each entry: the idea in one or two lines, the equation when it carries the point,
 the primary citation (author year venue), and what breaks it. Facts newer than this file's last revision
-(2026-10) must be web-checked; mark anything not opened "(unverified)" as robotics-research-brief does.
+(2026-10) must be web-checked; mark anything not opened "(unverified)".
 
 Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–critic (DDPG/TD3/SAC) ·
 4 Distributional · 5 Model-based · 6 Exploration · 7 Offline · 8 Imitation, distillation, teacher–student ·

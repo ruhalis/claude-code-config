@@ -25,9 +25,8 @@ core/                  source of truth: agents and skills
   agents/*.md            the specialists, in Claude's format
   skills/*/              SKILL.md skills
   skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
-  skills/teach/          personal tutor, quizzes and Artifact lessons (written for Claude Code: uses AskUserQuestion, Agent and Artifact; package-skills.sh still packages it)
   skills/pcb-author/     the only write path for a board: Zener sources and Diode's pcb CLI, Fable only (Claude Code only; carries Diode's five skills as references, MIT, pinned in SKILL.md)
-  skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code, like teach)
+  skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code: uses Agent and Artifact; package-skills.sh still packages it)
 adapters/
   claude/                CLAUDE.md + settings.json + keybindings.json + subagent-statusline.sh + hooks/
   vscode/                extensions.txt — extension IDs to install; settings.json — user settings (merged)
@@ -97,11 +96,10 @@ The skills hold workflow and boundaries; project facts live in the project, in `
 | Section | Read by | Keys |
 |---|---|---|
 | `## Boards` | esp-idf | `<board name>: <serial port>` |
-| `## Hardware` | kicad-review, pcb-author, pcb-enclosure, robotics-research-brief | `kicad:`, `pins:` (the firmware pin header), `mcu:`, `fab:`, `note:` |
+| `## Hardware` | kicad-review, pcb-author, pcb-enclosure | `kicad:`, `pins:` (the firmware pin header), `mcu:`, `fab:`, `note:` |
 | `## Print` (optional) | pcb-enclosure | `printer:`, `nozzle:`, `material:`; absent means 0.4 mm nozzle, PLA or PETG |
 | `## Motors` | motor-bench | `rule:`, `rig:`, `program:`, `send:`, `probe:`, `moves:`, `stop:`, `user-only:`, `kill:`, `limits:`, `watchdog:`, `supply:`, `direction:`, `log:` |
 | `## Experiments` | rl-advisor | `log:`, `run-id:`, `runs:`, `metric:`, `eval:`, `framework:` |
-| `## Where things run` | robotics-research-brief | robot, GPUs and VRAM, Jetson, simulator versions |
 
 Keep this order, `## Boards` first and short: esp-idf reads a fixed 12 lines after its heading, and motor-bench reads up to the next heading. The sections also connect skills: when firmware changes the header `## Hardware` names as `pins:`, esp-idf hands back to kicad-review's pin diff, and a flash or reset of a board wired to ESCs or drivers follows motor-bench as well as esp-idf. led-animation reads the free-form `CLAUDE.md` section on the renderer and the host tooling's README instead; isaac reads the pin from `CLAUDE.md`, `.gitmodules` and `STATUS.md`. rl-advisor answers the RL theory and design questions around a run and keeps its record (in aquila the ledger row and its EVIDENCE §9 row, elsewhere an entry in the template of `references/isaac-lab-log.md`); its `references/aquila-map.md` digests only the durable facts of aquila (structure, locked hyperparameters, method, closed results with their EVIDENCE section); the moving state (shipped student, open decisions, pending verdicts) stays in `verro/STATUS.md` and `verro/EVIDENCE.md` and the digest points at it by row ID, so refresh the digest only when a lever is kept or a campaign closes, not per run.
 
