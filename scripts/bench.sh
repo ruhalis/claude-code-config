@@ -74,7 +74,7 @@ check "claude CLI installed" command -v claude
 
 echo "-- symlinks from install.sh"
 check "~/.claude/CLAUDE.md -> adapters/claude/CLAUDE.md" linked_to "$CLAUDE_DIR/CLAUDE.md" "$REPO_DIR/adapters/claude/CLAUDE.md"
-for a in Explore deep-reasoner fast-executor implementer verifier video-maker; do
+for a in Explore deep-reasoner fast-executor implementer verifier; do
     check "~/.claude/agents/$a.md -> core/agents" linked_to "$CLAUDE_DIR/agents/$a.md" "$REPO_DIR/core/agents/$a.md"
 done
 for d in "$REPO_DIR"/core/skills/*/; do
@@ -118,15 +118,15 @@ fi
 echo "-- agent frontmatter"
 # bash 3.2 on macOS has no associative arrays
 wm() { case $1 in Explore) echo haiku;; deep-reasoner|implementer) echo opus;; *) echo sonnet;; esac; }
-we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; implementer|video-maker) echo high;; *) echo medium;; esac; }
-for a in Explore deep-reasoner fast-executor implementer verifier video-maker; do
+we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; implementer) echo high;; *) echo medium;; esac; }
+for a in Explore deep-reasoner fast-executor implementer verifier; do
     f="$REPO_DIR/core/agents/$a.md"
     check "$a: model is $(wm "$a")" test "$(fm "$f" model)" = "$(wm "$a")"
     check "$a: effort is $(we "$a")" test "$(fm "$f" effort)" = "$(we "$a")"
     check "$a: name matches filename" test "$(fm "$f" name)" = "$a"
 done
 posint() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
-for a in fast-executor implementer verifier video-maker; do
+for a in fast-executor implementer verifier; do
     check "$a: maxTurns is a positive integer" posint "$(fm "$REPO_DIR/core/agents/$a.md" maxTurns)"
 done
 check "deep-reasoner has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/deep-reasoner.md'"
@@ -149,23 +149,19 @@ for c in "pytest -q" "uv run python -m pytest" "npm test" "cargo test" "go test 
     check "main denies: $c" deny_main "$c"
 done
 reason_has() { main_json "$2" | "$GUARD" | jq -e --arg w "$1" '.hookSpecificOutput.permissionDecisionReason|test($w)' >/dev/null; }
-for c in "npx hyperframes render" "npx -y hyperframes@latest check" "cd /tmp/x && hyperframes snapshot" "pnpm dlx hyperframes preview"; do
-    check "main denies: $c" deny_main "$c"
-    check "deny reason names video-maker: $c" reason_has video-maker "$c"
-done
 for c in 'idf.py -C "/x y" -p "/dev/cu.x" flash' "idf.py -p /dev/cu.x flash" "idf.py -C dir -B build -p port flash" "idf.py --build-dir build flash" \
     "idf.py --build-dir=build flash" "idf.py -C d monitor" "idf.py set-target esp32s3" "idf.py -C d erase-flash" "idf.py -C d app-flash" \
-    "grep -r hyperframes ." "ls ~/.claude/plugins/marketplaces/hyperframes" "cat hyperframes/README.md" "cat pytest.ini" "ls go tests/x" "cat build/log.txt" "ls build" "git status" "make" "echo npm testing" "echo done"; do
+    "cat pytest.ini" "ls go tests/x" "cat build/log.txt" "ls build" "git status" "make" "echo npm testing" "echo done"; do
     check "main allows: $c" pass_main "$c"
 done
-for c in "pytest -q" "idf.py -C dir build" "npm test" "npx hyperframes render"; do
+for c in "pytest -q" "idf.py -C dir build" "npm test"; do
     check "subagent allows: $c" pass_sub "$c"
 done
 # heredoc bodies and quoted strings are ignored when matching
 for c in $'git commit -q -F - <<\'EOF\'\nbuild ok, the shim builds, pytest 382 passed / 6 CUDA skips\nEOF' \
     $'cat > note.md <<EOF\ntests run as cd x && python -m pytest -q\nEOF\necho ok' \
     $'cat <<-\'EOF\'\n\tmake test\n\tEOF' \
-    'git commit -m "ran pytest and cargo build"' 'echo "npx hyperframes render"' \
+    'git commit -m "ran pytest and cargo build"' \
     'idf.py -C "/x/build" -p "/dev/cu.usbmodem1" flash'; do
     check "main allows: $c" pass_main "$c"
 done
@@ -175,15 +171,15 @@ for c in $'cat > a.md <<\'EOF\'\nnotes\nEOF\npytest -q' \
     check "main denies: $c" deny_main "$c"
     check "deny reason names verifier: $c" reason_has verifier "$c"
 done
-c='cat <<<"x" && npx hyperframes render'
+c='cat <<<"x" && pytest -q'
 check "main denies: $c" deny_main "$c"
-check "deny reason names video-maker: $c" reason_has video-maker "$c"
+check "deny reason names verifier: $c" reason_has verifier "$c"
 # a separator, an argument, a path prefix or a subshell next to the runner (allowed until 2026-11-16),
 # and the keyword and wrapper shapes the loose match has always caught
 for c in 'pytest; echo done' 'pytest|tail -5' 'pytest&&echo ok' 'pytest >out.txt 2>&1' 'idf.py build; echo $?' 'idf.py build|tail' 'make test;' 'cargo test|tail' 'ctest;' \
     'npm test -- --watch' 'npm test foo' 'bun test src/' 'pnpm test --filter x' '.venv/bin/pytest -q' '/usr/local/bin/ninja -C build' '(pytest)' 'x=$(pytest)' 'if true; then pytest; fi' \
     'if pytest -q; then echo ok; fi' '! pytest' '{ pytest; }' 'sudo pytest' 'ssh host pytest' 'poetry run pytest' 'python -m coverage run -m pytest' 'caffeinate -i idf.py build' \
-    'env X=1 pytest' 'timeout 600 pytest' 'cat x | xargs pytest' 'echo start && idf.py build' 'for f in a b; do pytest $f; done' 'npx hyperframes render; echo done'; do
+    'env X=1 pytest' 'timeout 600 pytest' 'cat x | xargs pytest' 'echo start && idf.py build' 'for f in a b; do pytest $f; done'; do
     check "main denies: $c" deny_main "$c"
 done
 # a segment whose command only names or reads things can't start a run
@@ -199,7 +195,7 @@ guard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/ba
 check "GUARD_MAIN_SESSION_OFF=1 works without jq" guard_off_nojq
 check "missing jq fails closed (exit 1 + message)" guard_nojq_fails
 check "deny reason names the verifier" reason_names_verifier
-check "pytest deny reason names verifier, not video-maker" bash -c "! { $(declare -f main_json); GUARD='$GUARD'; main_json pytest | \"\$GUARD\" | grep -q video-maker; }"
+check "pytest deny reason names verifier" reason_names_verifier
 
 echo "-- KiCad guard hook on synthetic input"
 KGUARD="${BENCH_KGUARD:-$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh}"

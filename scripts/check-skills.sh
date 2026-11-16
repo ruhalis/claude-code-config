@@ -167,7 +167,7 @@ def frontmatter(text):
 # ---- per-skill checks ----
 
 def packaged(rel):
-    """True if package-skills.sh (and skill-creator's packager) would include rel."""
+    """True if skill-creator's packager would include rel."""
     if any(p in NOT_PACKAGED for p in rel.parts[:-1]):
         return False
     return not (len(rel.parts) > 1 and rel.parts[0] == "evals")
@@ -318,9 +318,9 @@ def check_skill(skill):
 
     for p, r in zip(files, rels):
         if p.name == ".DS_Store" or (p.suffix == ".pyc" and "__pycache__" not in r.parts):
-            warn(f"stray {r} (git and package-skills.sh skip it; safe to delete)")
+            warn(f"stray {r} (git skips it; safe to delete)")
     for d in sorted(root.rglob("__pycache__")):
-        warn(f"stray {d.relative_to(root)}/ (git and package-skills.sh skip it; safe to delete)")
+        warn(f"stray {d.relative_to(root)}/ (git skips it; safe to delete)")
 
     summary = f"{parsed} files parsed, {helped} --help runs, {len(paths)} bundled paths, {len(pins)} read by scripts"
     status = "FAIL" if any(l == "FAIL" for l, _ in problems) else "warn" if problems else "ok"

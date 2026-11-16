@@ -12,10 +12,16 @@
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true,
     "cloudflare@cloudflare": true,
+    "data@knowledge-work-plugins": true,
+    "design@knowledge-work-plugins": true,
+    "desktop-commander@claude-plugins-official": true,
+    "document-skills@anthropic-agent-skills": true,
+    "engineering@knowledge-work-plugins": true,
     "frontend-design@claude-plugins-official": true,
-    "hyperframes@hyperframes": true,
     "kicad-happy@kicad-happy": true,
+    "pdf-viewer@knowledge-work-plugins": true,
     "rea@rea": true,
+    "skill-creator@claude-plugins-official": true,
     "text-to-cad@text-to-cad": true
   },
   "extraKnownMarketplaces": {
@@ -26,11 +32,19 @@
       },
       "autoUpdate": true
     },
-    "hyperframes": {
+    "knowledge-work-plugins": {
       "source": {
         "source": "github",
-        "repo": "heygen-com/hyperframes"
-      }
+        "repo": "anthropics/knowledge-work-plugins"
+      },
+      "autoUpdate": true
+    },
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      },
+      "autoUpdate": true
     },
     "cloudflare": {
       "source": {
@@ -48,6 +62,35 @@
   },
   "syncClaudeAiPlugins": false,
   "syncClaudeAiSkills": false,
+  "deniedMcpServers": [
+    { "serverName": "plugin:data:snowflake" },
+    { "serverName": "plugin:data:databricks" },
+    { "serverName": "plugin:data:bigquery" },
+    { "serverName": "plugin:data:hex" },
+    { "serverName": "plugin:data:amplitude" },
+    { "serverName": "plugin:data:amplitude-eu" },
+    { "serverName": "plugin:data:atlassian" },
+    { "serverName": "plugin:data:definite" },
+    { "serverName": "plugin:design:slack" },
+    { "serverName": "plugin:design:figma" },
+    { "serverName": "plugin:design:linear" },
+    { "serverName": "plugin:design:asana" },
+    { "serverName": "plugin:design:atlassian" },
+    { "serverName": "plugin:design:notion" },
+    { "serverName": "plugin:design:intercom" },
+    { "serverName": "plugin:design:google calendar" },
+    { "serverName": "plugin:design:gmail" },
+    { "serverName": "plugin:engineering:slack" },
+    { "serverName": "plugin:engineering:linear" },
+    { "serverName": "plugin:engineering:asana" },
+    { "serverName": "plugin:engineering:atlassian" },
+    { "serverName": "plugin:engineering:notion" },
+    { "serverName": "plugin:engineering:github" },
+    { "serverName": "plugin:engineering:pagerduty" },
+    { "serverName": "plugin:engineering:datadog" },
+    { "serverName": "plugin:engineering:google calendar" },
+    { "serverName": "plugin:engineering:gmail" }
+  ],
   "advisorModel": "fable",
   "skillListingBudgetFraction": 0.015,
   "modelSettings": {
@@ -105,10 +148,36 @@
       "Bash(rm -rf ~)",
       "Bash(rm -rf /)",
       "Skill(text-to-cad:pcb)",
-      "Skill(text-to-cad:pcb *)"
+      "Skill(text-to-cad:pcb *)",
+      "Skill(text-to-cad:sendcutsend)",
+      "Skill(text-to-cad:sendcutsend *)",
+      "Skill(kicad-happy:pcbway)",
+      "Skill(kicad-happy:pcbway *)",
+      "Skill(cloudflare:basin)",
+      "Skill(cloudflare:basin *)",
+      "Skill(cloudflare:k2)",
+      "Skill(cloudflare:k2 *)",
+      "Skill(cloudflare:gateway-workers)",
+      "Skill(cloudflare:gateway-workers *)",
+      "Skill(cloudflare:cloudflare-one-migrations)",
+      "Skill(cloudflare:cloudflare-one-migrations *)",
+      "Skill(cloudflare:sandbox-stable)",
+      "Skill(cloudflare:sandbox-stable *)",
+      "Skill(cloudflare:sandbox-next)",
+      "Skill(cloudflare:sandbox-next *)",
+      "Skill(cloudflare:sandbox-migrate-to-next)",
+      "Skill(cloudflare:sandbox-migrate-to-next *)"
     ],
     "ask": [
-      "mcp__plugin_rea_rea__*"
+      "mcp__plugin_rea_rea__*",
+      "mcp__plugin_desktop-commander_desktop-commander__write_file",
+      "mcp__plugin_desktop-commander_desktop-commander__write_pdf",
+      "mcp__plugin_desktop-commander_desktop-commander__edit_block",
+      "mcp__plugin_desktop-commander_desktop-commander__move_file",
+      "mcp__plugin_desktop-commander_desktop-commander__create_directory",
+      "mcp__plugin_desktop-commander_desktop-commander__set_config_value",
+      "mcp__plugin_desktop-commander_desktop-commander__kill_process",
+      "mcp__plugin_desktop-commander_desktop-commander__force_terminate"
     ]
   },
   "hooks": {

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook (matcher: Bash). Denies test, build and validation commands
 # in the MAIN session only; the orchestration rule in CLAUDE.md sends those to
-# the verifier subagent. Also denies the HyperFrames CLI there, which goes to
-# the video-maker subagent. Subagent calls carry agent_id in the hook input and
+# the verifier subagent. Subagent calls carry agent_id in the hook input and
 # pass through untouched. Set GUARD_MAIN_SESSION_OFF=1 in settings `env` to
 # disable without removing the hook. Exit 0 with no output = no decision.
 set -u
@@ -49,14 +48,6 @@ pattern='(^|[;&|(/[:space:]])(pytest|py\.test|(python3?|uv run|uvx)[[:space:]]+(
 opts='-C|-B|-G|-p|-b|-D|--project-dir|--build-dir|--port|--baud|--generator|--define-cache-entry'
 stripped=$(printf '%s' "$scan" | sed -E "s/(^|[[:space:]])($opts)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:];&|]+)/\1/g")
 idf='idf\.py([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(build|app|bootloader|size|size-components|size-files)'"$end"
-# HyperFrames CLI in command position (start, or after ; & |), bare or through npx/bunx/pnpx/pnpm dlx/npm exec.
-# Command position only, so "grep hyperframes" or a path containing the word passes.
-hf='(^|[;&|])[[:space:]]*((npx|bunx|pnpx)([[:space:]]+(-y|--yes))*[[:space:]]+|pnpm[[:space:]]+dlx[[:space:]]+|npm[[:space:]]+exec[[:space:]]+(--[[:space:]]+)?)?hyperframes(@[^[:space:]]*)?([[:space:];&|)<>]|$)'
-if printf '%s' "$scan" | grep -qE "$hf"; then
-  jq -n --arg reason "Blocked in the main session: HyperFrames video work (check, snapshot, preview, render) goes to the video-maker subagent (Agent tool, subagent_type \"video-maker\"), per CLAUDE.md. Subagents may run this command." \
-    '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'
-  exit 0
-fi
 if printf '%s' "$scan" | grep -qE "$pattern" || printf '%s' "$stripped" | grep -qE "$idf"; then
   jq -n --arg reason "Blocked in the main session: tests, builds and validation runs go to the verifier subagent (Agent tool, subagent_type \"verifier\"), per CLAUDE.md. Subagents may run this command." \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'

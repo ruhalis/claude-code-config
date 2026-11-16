@@ -5,3 +5,6 @@ __pycache__/
 
 # claude.ai-side skill archives dropped here by hand
 Claude outputs/
+
+# Anthropic's claude.ai account skill, restored from a local copy; not ours to publish
+core/skills/deep-research/
