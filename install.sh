@@ -97,10 +97,27 @@ JQ_KEYBINDINGS='(.[0] * .[1]) + {bindings: ((((.[0].bindings // []) + (.[1].bind
 # VS Code settings: repo wins on the keys it declares; every live-only key survives.
 JQ_VSCODE='.[0] * .[1]'
 
+# merge_check <src> <dst> <jq program> — stop unless merge_json can merge src
+# into dst. Run for every merged Claude file before anything is changed. A live
+# file that cannot be merged is never replaced by the repo copy: that would drop
+# the keys only the live file has (model, modelSettings, effortLevel, autoMode).
+merge_check() {
+    local src="$1" dst="$2" prog="$3"
+    [ -f "$dst" ] && [ ! -L "$dst" ] || return 0   # no live file to lose; merge_json copies
+    command -v jq >/dev/null 2>&1 ||
+        die "jq not found, so $dst cannot be merged. Install jq (brew install jq) and re-run. Nothing was changed."
+    jq -e . "$dst" >/dev/null 2>&1 ||
+        die "$dst is not valid JSON, so it cannot be merged. Fix it or move it away, then re-run. Nothing was changed."
+    jq -s "$prog" "$dst" "$src" 2>/dev/null | jq -e . >/dev/null 2>&1 ||
+        die "merging ${src#"$REPO_DIR"/} into $dst failed (is its top level a JSON object?). Fix it or move it away, then re-run. Nothing was changed."
+}
+
 # merge_json <src> <dst> <jq program> [backup label, default claude] — back up
-# and merge: repo (src) over live (dst). Missing/non-regular dst, no jq, or
-# invalid live JSON: backup + copy. The merge goes to a temp file and is
-# validated before backup() moves dst away.
+# and merge: repo (src) over live (dst). A missing or non-regular dst is backed
+# up and replaced by a copy. A live file that cannot be merged (no jq, invalid
+# JSON, a failing merge) stops the install and stays as it is; merge_check
+# catches those cases earlier, before anything is changed. The merge goes to a
+# temp file and is validated before backup() moves dst away.
 merge_json() {
     local src="$1" dst="$2" prog="$3" label="${4:-claude}" tmp changed
     if [ ! -f "$dst" ] || [ -L "$dst" ]; then
@@ -108,19 +125,12 @@ merge_json() {
         copy "$src" "$dst"
         return 0
     fi
-    if ! command -v jq >/dev/null 2>&1; then
-        warn "jq not found; $dst is replaced, not merged"
-        backup "$dst" "$label"; copy "$src" "$dst"; return 0
-    fi
-    if ! jq -e . "$dst" >/dev/null 2>&1; then
-        warn "$dst is not valid JSON; replaced, not merged"
-        backup "$dst" "$label"; copy "$src" "$dst"; return 0
-    fi
+    command -v jq >/dev/null 2>&1 || die "jq not found; $dst left as it is, not merged"
+    jq -e . "$dst" >/dev/null 2>&1 || die "$dst is not valid JSON; left as it is, not merged"
     tmp=$(mktemp "${TMPDIR:-/tmp}/merge.XXXXXX")
     if ! jq -s "$prog" "$dst" "$src" > "$tmp" || ! jq -e . "$tmp" >/dev/null 2>&1; then
         rm -f "$tmp"
-        warn "merge of $dst failed; replaced, not merged"
-        backup "$dst" "$label"; copy "$src" "$dst"; return 0
+        die "merge of $dst failed; left as it is, not merged"
     fi
     if [ "$DRY_RUN" = 1 ]; then
         changed=$(jq -rn --slurpfile a "$dst" --slurpfile b "$tmp" \
@@ -236,6 +246,17 @@ skill_checks() {
 }
 
 # ----------------------------------------------------------------- tools ----
+
+# Run before anything is changed. jq is required outright: the settings merge
+# needs it, and both guard hooks fail closed without it, so a machine without jq
+# would have every Bash call blocked.
+preflight_claude() {
+    local dir="$HOME/.claude"
+    command -v jq >/dev/null 2>&1 ||
+        die "jq not found. The settings merge needs it, and the guard hooks block every Bash call without it. Install jq (brew install jq) and re-run. Nothing was changed."
+    merge_check "$REPO_DIR/adapters/claude/settings.json" "$dir/settings.json" "$JQ_SETTINGS"
+    merge_check "$REPO_DIR/adapters/claude/keybindings.json" "$dir/keybindings.json" "$JQ_KEYBINDINGS"
+}
 
 install_claude() {
     local dir="$HOME/.claude"
@@ -410,6 +431,11 @@ for t in "${TOOLS[@]}"; do
     UNIQ+=("$t")
 done
 TOOLS=("${UNIQ[@]}")
+
+# Stop here, before anything is changed, if the Claude merges cannot work.
+case " ${TOOLS[*]} " in
+    *" claude "*) preflight_claude ;;
+esac
 
 printf '%sInstalling from %s%s\n' "$B" "$REPO_DIR" "$RST"
 [ "$DRY_RUN" = 1 ] && printf '%s(dry run — nothing will be written)%s\n' "$YEL" "$RST"
