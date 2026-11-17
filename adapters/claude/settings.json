@@ -49,7 +49,8 @@
     "cloudflare": {
       "source": {
         "source": "github",
-        "repo": "cloudflare/skills"
+        "repo": "cloudflare/skills",
+        "ref": "cbf893b954222276bf1af57e5f23379231e0efb9"
       }
     },
     "rea": {
@@ -92,7 +93,7 @@
     { "serverName": "plugin:engineering:gmail" }
   ],
   "advisorModel": "fable",
-  "skillListingBudgetFraction": 0.015,
+  "skillListingBudgetFraction": 0.02,
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "xhigh"
@@ -140,6 +141,10 @@
       "Bash(git *push* +*)",
       "mcp__plugin_desktop-commander_desktop-commander__start_process",
       "mcp__plugin_desktop-commander_desktop-commander__interact_with_process",
+      "mcp__plugin_desktop-commander_desktop-commander__write_file",
+      "mcp__plugin_desktop-commander_desktop-commander__write_pdf",
+      "mcp__plugin_desktop-commander_desktop-commander__edit_block",
+      "mcp__plugin_desktop-commander_desktop-commander__move_file",
       "Bash(git reset --hard *)",
       "Bash(git clean -fd *)",
       "Bash(git clean -fdx *)",
@@ -151,6 +156,8 @@
       "Skill(text-to-cad:pcb *)",
       "Skill(text-to-cad:sendcutsend)",
       "Skill(text-to-cad:sendcutsend *)",
+      "Skill(kicad-happy:kicad)",
+      "Skill(kicad-happy:kicad *)",
       "Skill(kicad-happy:pcbway)",
       "Skill(kicad-happy:pcbway *)",
       "Skill(cloudflare:basin)",
@@ -170,10 +177,7 @@
     ],
     "ask": [
       "mcp__plugin_rea_rea__*",
-      "mcp__plugin_desktop-commander_desktop-commander__write_file",
-      "mcp__plugin_desktop-commander_desktop-commander__write_pdf",
-      "mcp__plugin_desktop-commander_desktop-commander__edit_block",
-      "mcp__plugin_desktop-commander_desktop-commander__move_file",
+      "mcp__plugin_cloudflare_cloudflare__execute",
       "mcp__plugin_desktop-commander_desktop-commander__create_directory",
       "mcp__plugin_desktop-commander_desktop-commander__set_config_value",
       "mcp__plugin_desktop-commander_desktop-commander__kill_process",
@@ -188,6 +192,17 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/guard-main-session.sh",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/guard-git-write.sh",
             "timeout": 10,
             "onFailure": "block"
           }

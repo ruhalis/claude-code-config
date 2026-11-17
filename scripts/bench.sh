@@ -7,9 +7,9 @@
 #                               several minutes; needs `claude` logged in)
 #   scripts/bench.sh --live --only L2,L5   run a subset of the live cases
 #   scripts/bench.sh --keep     keep the live scratch dir for inspection
-#   BENCH_GUARD=<file> BENCH_KGUARD=<file> scripts/bench.sh
+#   BENCH_GUARD=<file> BENCH_KGUARD=<file> BENCH_GITGUARD=<file> scripts/bench.sh
 #                               run the synthetic hook cases against candidate
-#                               copies of the two guard hooks. The live hooks are
+#                               copies of the three guard hooks. The live hooks are
 #                               symlinks into this repo, so an edit in place is
 #                               live at once and a broken one blocks every call:
 #                               test a copy this way first, then copy it over.
@@ -85,6 +85,8 @@ check "~/.claude/hooks/guard-main-session.sh -> adapters/claude/hooks" linked_to
 check "guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "~/.claude/hooks/guard-kicad-edit.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+check "~/.claude/hooks/guard-git-write.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-git-write.sh" "$REPO_DIR/adapters/claude/hooks/guard-git-write.sh"
+check "git-write guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-git-write.sh"
 check "KiCad guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
 check "KiCad guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
 
@@ -96,6 +98,8 @@ for f in "$REPO_S" "$LIVE_S"; do
     tag=$([ "$f" = "$REPO_S" ] && echo repo || echo live)
     check "$tag: PreToolUse hook on Bash runs guard-main-session.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-main-session.sh")) | select(.onFailure=="block")' "$f"
+    check "$tag: PreToolUse hook on Bash runs guard-git-write.sh with onFailure block" \
+        jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-git-write.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: PreToolUse hook on Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].* runs guard-kicad-edit.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
@@ -270,6 +274,69 @@ check "GUARD_KICAD_OFF=1 disables the hook" kguard_off
 check "KiCad guard: missing jq fails closed (exit 1 + message)" kguard_nojq_fails
 check "KiCad guard: empty input is no decision" bash -c "o=\$(printf '{}' | '$KGUARD'); [ -z \"\$o\" ]"
 rm -rf "$KT"
+
+echo "-- git-write guard hook on synthetic input"
+GGUARD="${BENCH_GITGUARD:-$REPO_DIR/adapters/claude/hooks/guard-git-write.sh}"
+[ -z "${BENCH_GITGUARD:-}" ] || printf '  NOTE  testing a candidate git-write guard: %s\n' "$GGUARD"
+check "git-write guard hook is executable" test -x "$GGUARD"
+check "git-write guard hook passes bash -n" bash -n "$GGUARD"
+g_deny()     { main_json "$1" | "$GGUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
+g_deny_sub() { sub_json "$1" | "$GGUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
+g_pass()     { local o rc; o=$(main_json "$1" | "$GGUARD"); rc=$?; [ "$rc" -eq 0 ] && [ -z "$o" ]; }
+g_reason()   { main_json "$2" | "$GGUARD" | jq -e --arg w "$1" '.hookSpecificOutput.permissionDecisionReason|test($w)' >/dev/null; }
+for c in 'git commit -m x' 'git commit' 'git commit --amend' 'git -C /tmp/r commit' 'git -C /tmp/r commit -m x' \
+    'git -c user.name=a -c user.email=b commit -m x' 'git --git-dir=.git --work-tree=. push' 'git --no-pager push origin main' '/usr/bin/git push' \
+    'cd repo && git push' 'git add f; git commit -m x' 'true || git merge feature' 'FOO=1 git rebase main' 'env GIT_DIR=.git git cherry-pick abc' \
+    'git revert HEAD' 'git tag v1' 'git -C x tag' 'echo done | xargs git push' '(git commit -m x)' 'out=$(git push 2>&1)' \
+    'git add -A' 'git add --all' 'git add -u' 'git add .' 'git -C x add .' 'git add -Av' 'gh pr create --fill' 'gh -R o/r pr create' \
+    'git --git-dir .git push' 'git -C $(pwd) commit' 'git -C "$dir" commit' 'git -C ${D} commit' 'x="$(git push)"' 'echo `git push`' \
+    $'git \\\n  push' $'git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)"' $'cat > m.txt <<EOF\nmsg\nEOF\ngit commit -F m.txt' \
+    '{ git push; }' 'if git push; then echo ok; fi' '! git push' 'sudo -u me git push' 'command git push' 'nohup git push &' 'time git commit -m x' \
+    'exec git push' 'xargs -I{} git -C {} push' 'git add -vu' 'git add --update' 'git add -- .' 'gh pr -R o/r create' 'git commit -m "msg" # note' \
+    'git push>log 2>&1' '>log git push' 'git >/dev/null push' '2> err git -C x commit'; do
+    check "git guard denies: $c" g_deny "$c"
+done
+for c in 'git status' 'git -C dir status' 'git diff --cached --stat' 'git log --grep=commit' 'git log --oneline | grep push' 'git show HEAD' \
+    'git blame f' 'git merge-base a b' 'git for-each-ref refs/tags' 'git add path/to/file other/file' 'git restore --staged f' 'git stash' \
+    'git rev-parse --show-toplevel' 'echo "git commit -m x"' "printf 'run git push\\n'" $'cat > note.md <<\'EOF\'\ngit commit -m x && git push\nEOF' \
+    'grep -rn "git push" docs/' 'gh pr view 12' 'gh pr list' 'ls commit' 'cat push.txt' \
+    'git add -p f' 'git add -- f' 'git -c core.pager=cat log' 'git config --get user.name' 'echo hi # git push' 'command -v git' \
+    'xargs -I{} echo {}' 'gh pr checks 3' 'gh issue create --title x' 'git log --format="%h %s" | head' 'which gh git'; do
+    check "git guard allows: $c" g_pass "$c"
+done
+# wrappers, shell -c re-entry, and quoted text spanning lines
+for c in 'timeout 60 git push' 'timeout -s KILL -k 5 60 git commit -m x' 'timeout --foreground 1m git push' 'nice -n 10 git push' 'nice git commit' \
+    'caffeinate -i git push' 'caffeinate -t 600 git push' 'stdbuf -oL git push' 'stdbuf -o L -e 0 git commit' \
+    "bash -c 'git commit -m x'" 'sh -c "cd r && git push"' "zsh -lc 'git -C r commit'" 'bash -c "git add -A"' "/bin/bash -l -c 'git push'" \
+    "sudo bash -c 'git push'" "bash -c 'echo \"a\"; git commit -m \"b\"'" 'bash -c "$(echo x) && git push"' \
+    $'git commit -m "subject\n\nbody"' $'gh issue create --body "a\n$(git push)\nb"'; do
+    check "git guard denies: $c" g_deny "$c"
+done
+for c in "bash -c 'git status'" 'sh -c "echo hi"' 'bash script.sh' 'timeout 60 git status' 'nice -n 5 git log' 'caffeinate -t 5 ls' \
+    $'gh issue create --body "first line\ngit push origin main\nthird line"' $'echo \'one\ngit commit -m x\ntwo\'' \
+    $'git log --format="%h\ngit push"' 'echo "it'"'"'s \"quoted\"; git push"' 'echo x\#y git push' 'echo bash -c' 'grep -c push f'; do
+    check "git guard allows: $c" g_pass "$c"
+done
+for c in 'git commit -m x' 'git -C /tmp/r push' 'git add -A'; do
+    check "git guard denies in a subagent too: $c" g_deny_sub "$c"
+done
+check "git guard reason names the subcommand (git commit)" g_reason "git commit" 'git -C /tmp/r commit -m x'
+check "git guard reason names the subcommand (git push)" g_reason "git push" '/usr/bin/git push'
+check "git guard reason names the subcommand (git add -A)" g_reason "git add -A" 'git add -A'
+check "git guard reason names the subcommand (gh pr create)" g_reason "gh pr create" 'gh -R o/r pr create'
+check "git guard reason says to stage with git add <path>" g_reason "git add <path>" 'git push'
+check "git guard reason says to name explicit paths for add" g_reason "explicit paths" 'git add .'
+check "git guard reason does not mention the verifier" bash -c "! { jq -n '{tool_name:\"Bash\",tool_input:{command:\"git push\"}}' | '$GGUARD' | grep -qi verifier; }"
+for c in 'git commit -m "x' 'echo $(' ')))' 'git \' '`' '$((1+2)) git status' $'cat <<EOF\nno end'; do
+    check "git guard: odd input gives no crash: $c" bash -c "jq -n --arg c \"\$1\" '{tool_name:\"Bash\",tool_input:{command:\$c}}' | '$GGUARD' >/dev/null" _ "$c"
+done
+gguard_off() { local o; o=$(main_json 'git push' | GUARD_GIT_WRITE_OFF=1 "$GGUARD"); [ -z "$o" ]; }
+gguard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/bash "$GGUARD" 2>&1 >/dev/null); rc=$?; [ "$rc" -eq 1 ] && printf '%s' "$e" | grep -q "install jq"; }
+check "GUARD_GIT_WRITE_OFF=1 disables the hook" gguard_off
+check "git guard: missing jq fails closed (exit 1 + message)" gguard_nojq_fails
+check "git guard: empty input is no decision" bash -c "o=\$(printf '{}' | '$GGUARD'); [ -z \"\$o\" ]"
+check "git guard: non-JSON input is no decision, exit 0" bash -c "o=\$(printf 'not json' | '$GGUARD'); [ -z \"\$o\" ]"
+check "git guard: non-Bash tool is no decision" bash -c "o=\$(jq -n '{tool_name:\"Edit\",tool_input:{command:\"git push\",file_path:\"x\"}}' | '$GGUARD'); [ -z \"\$o\" ]"
 
 echo "-- instructions and skills"
 check "CLAUDE.md names the KiCad guard hook" grep -q "guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/CLAUDE.md"

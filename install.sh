@@ -270,11 +270,12 @@ install_claude() {
     link "$REPO_DIR/adapters/claude/subagent-statusline.sh" "$dir/subagent-statusline.sh"
     [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/subagent-statusline.sh"
 
-    # hooks, wired in settings.json: the main-session guard (PreToolUse on Bash)
-    # and the KiCad guard (PreToolUse on Edit, Write and Bash; Fable-only writes)
+    # hooks, wired in settings.json: the main-session guard (PreToolUse on Bash),
+    # the KiCad guard (PreToolUse on Edit, Write and Bash; Fable-only writes)
+    # and the git-write guard (PreToolUse on Bash; no commit, push, merge ... for anyone)
     mk "$dir/hooks"
     local h
-    for h in guard-main-session.sh guard-kicad-edit.sh; do
+    for h in guard-main-session.sh guard-kicad-edit.sh guard-git-write.sh; do
         backup "$dir/hooks/$h" claude
         link "$REPO_DIR/adapters/claude/hooks/$h" "$dir/hooks/$h"
         [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/hooks/$h"
