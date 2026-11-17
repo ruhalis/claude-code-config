@@ -21,7 +21,7 @@ Bundled files. `${CLAUDE_SKILL_DIR}` is the directory holding this SKILL.md (Cla
 | `scripts/fab_export.sh` | Run only in step 7: `<pcb> <sch> <outdir>`. Gerbers, drill, BOM, CPL for JLCPCB, file-set and BOM-vs-CPL checks, `MANIFEST.txt`. |
 | `scripts/fab_diff.sh` | Run in step 9: `<old_outdir> <new_outdir>`. Two fab sets compared with timestamp lines stripped. |
 | `scripts/fabset.py` | Not run directly: the check, manifest and diff behind `fab_export.sh`, `fab_diff.sh` and `selftest.sh`. |
-| `assets/fixtures/` | Read by `selftest.sh`: a trimmed aquila-fc netlist from kicad-cli 10.0.5, a flat pin header, a trimmed fab set. |
+| `assets/fixtures/` | Read by `selftest.sh`: a trimmed kicad-cli 10.0.5 netlist of aquila-fc (aquila's former board; the fixtures keep its name), a flat pin header, a trimmed fab set. |
 | `references/esp32-s3-rules.md` | Read in step 1 when the MCU is an ESP32-S3. |
 | `references/schematic-review.md` | Read in step 3. |
 | `references/layout-review.md` | Read in step 6. |
@@ -34,7 +34,7 @@ Running outside Claude Code. In Cowork, run from the Mac copy at `~/projects/cla
 - **This skill reviews and never writes.** Under kicad-review Claude never writes `.kicad_sch`, `.kicad_pcb`, `.kicad_pro`, `.kicad_sym`, `.kicad_mod`, `.kicad_wks` or `.kicad_dru`: not by hand, not through `sed`, not through the bundled `pcbnew` Python (SWIG API, deprecated since KiCad 9, gone in 11), not through the IPC API (disabled on this machine). Reading them as text with `grep` is fine. Structured access goes through `kicad-cli` exports into a `review/` directory. Boards are drawn by the user in the KiCad GUI, or authored as code under the `pcb-author` skill, which is the only write path and runs on Claude Fable 5.2 or later only (`~/.claude/hooks/guard-kicad-edit.sh` denies the writes from any other model). This skill is the independent gate for both kinds of board.
 - **Never place, never route, never edit a file to silence ERC or DRC.** A finding is a sentence someone acts on: the user in the GUI, or a Fable agent under `pcb-author`; an exclusion is something the user marks in the GUI. Asked to place, route or "just fix the file" while reviewing: finish the finding as text, then hand the change to `pcb-author` if the session is on Fable, or say in one line that the change needs a Fable session.
 - **No other skill's write step applies.** Another skill's instruction to write symbol properties does not override the no-edit rule; what it would write (LCSC or MPN fields, datasheet URLs) goes to the user as GUI edits.
-- **One KiCad per machine**, pinned in `kicad-version`, invoked as `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`, never assumed on `PATH`. A different patch or minor is a printed warning; a different major is a stop, because the JSON and netlist shapes the scripts parse are per-major. Bumping is a deliberate edit of `kicad-version` after `selftest.sh` passes and a re-run on the known project, aquila-fc, matches its recorded counts (step 0). Never bump to make a script parse. Never install or update KiCad yourself.
+- **One KiCad per machine**, pinned in `kicad-version`, invoked as `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`, never assumed on `PATH`. A different patch or minor is a printed warning; a different major is a stop, because the JSON and netlist shapes the scripts parse are per-major. Bumping is a deliberate edit of `kicad-version` after `selftest.sh` passes and a re-run on the known project, aquila's `core` board, matches its recorded counts (step 0). Never bump to make a script parse. Never install or update KiCad yourself.
 - **Every electrical number has a source.** Pin numbers, package, absolute maximums, I2C addresses, strapping levels, supply currents, capacitor values: cite the fetched datasheet (URL and section or page) or the project's design note. Nothing from memory, including the tables in `references/`, which are starting points to re-verify, not authorities. Unreachable datasheet: the finding says `unverified`.
 - **Ordering and paying are human-only.** Step 7 produces the file set and a pre-upload checklist. Never upload, log in, fill a cart, or drive the fab site through a browser tool. Part numbers, stock and basic/extended status are looked up live at order time, never quoted from memory.
 - **Project facts come from the repo.** Missing pin header, unknown fab, unknown module variant: ask, never default.
@@ -65,17 +65,19 @@ hardware/<board>/review/                                    kicad-cli exports an
 hardware/<board>/fab/<date>/                                gerbers, BOM, CPL, zip, MANIFEST.txt, generated
 ```
 
+A board authored as code under `pcb-author` keeps its generated KiCad project one level down, in `hardware/boards/<board>/eda/` (aquila's `core` and `top`). That `eda/` directory is the board directory `B` in every step below. Its `fp-lib-table` points at `${KIPRJMOD}/../../../components` and `../../../.pcb/stdlib`, so a scratch copy must keep that depth (step 0 shows one), or ERC reports every footprint library as missing.
+
 Before the first commit, `git check-ignore -v hardware/<board>/lib/<x>.kicad_sym hardware/<board>/.history` must print a rule for `.history` and none for `lib/`: a Python `.gitignore` template ignores `lib/`.
 
 The `## Hardware` section sits next to `## Boards` in the project's `CLAUDE.md` (or `CLAUDE.local.md`), one `key: value` per line so it can be grepped:
 
 ```
 ## Hardware
-kicad: hardware/aquila-fc/aquila-fc.kicad_pro
-pins: firmware/main/app_config.h
-mcu: U1                          # reference designator of the MCU or module symbol
+kicad: hardware/boards/core/eda/core.kicad_pro
+pins: hardware/boards/core/core_pins.h
+mcu: U11                         # reference designator of the MCU or module symbol
 fab: jlcpcb, 4 layers, economic assembly
-note: hardware/aquila-fc/DESIGN.md
+note: hardware/DESIGN.md
 ```
 
 Resolve the project the way esp-idf resolves ports: the section, else a path named in this message, else exactly one `*.kicad_pro` in the repo (use it and offer to record the section), else zero: say so and stop, else several: ask.
@@ -98,16 +100,24 @@ A `WARNING: differs from pin` line (another patch or minor) runs the self-test b
 bash "${CLAUDE_SKILL_DIR}/scripts/selftest.sh"
 ```
 
-Exit 0: every assertion passed; carry on and say the pin differs. Exit 1: quote the FAIL lines and stop. It checks the scripts against a 10.0.5 fixture and cannot see a changed kicad-cli output. Before `kicad-version` is bumped, run the known project, `~/projects/aquila/hardware/aquila-fc` (mcu `U1`), through the new kicad-cli: copy it as in step 9 (no `review/` comes along, so nothing from the old kicad-cli is read back), run steps 1, 2, 4 and 5 on the copy with `--header ~/projects/aquila/firmware/main/app_config.h` read in place, and compare with what 10.0.5 gave on 2026-09-23. Each result depends on the files in its last column, recorded by their sha256 prefix:
+Exit 0: every assertion passed; carry on and say the pin differs. Exit 1: quote the FAIL lines and stop. It checks the scripts against a 10.0.5 fixture and cannot see a changed kicad-cli output. Before `kicad-version` is bumped, run the known project, aquila's `core` board at `~/projects/aquila/hardware/boards/core/eda` (mcu `U11`), through the new kicad-cli. Copy it with its library depth kept (no `review/` comes along, so nothing from the old kicad-cli is read back), run steps 1, 2, 4 and 5 on the copy with `--header ~/projects/aquila/hardware/boards/core/core_pins.h` read in place, and compare with what 10.0.5 gave on 2026-11-17:
+
+```bash
+A=~/projects/aquila/hardware; S="$(mktemp -d)"; mkdir -p "$S/hw/boards/core" "$S/hw/.pcb"
+rsync -a --exclude .history --exclude review --exclude fab "$A/boards/core/eda" "$S/hw/boards/core/"
+rsync -a "$A/components" "$S/hw/"; ln -s "$(readlink "$A/.pcb/stdlib")" "$S/hw/.pcb/stdlib"; echo "$S/hw/boards/core/eda"
+```
+
+Each result depends on the files in its last column, recorded by their sha256 prefix:
 
 | Step | 10.0.5 result | Depends on (sha256 prefix) |
 |---|---|---|
-| 2 ERC | exit 5: 2 warnings, `pin_to_pin` | `.kicad_sch` `f84fc673`, `.kicad_pro` `083a4366` |
-| 4 pin diff | exit 0: `errors=0 warnings=5 info=18`, only power pins unmapped | `.kicad_sch` `f84fc673`, `firmware/main/app_config.h` `b5e13dea` |
-| 5 DRC | exit 5: 4 errors `copper_edge_clearance`, 4 warnings `silk_edge_clearance`, 0 unconnected, 0 parity; zone fills stale (the refilled run keeps only the 4 warnings) | `.kicad_pcb` `8309b00b`, `.kicad_sch` `f84fc673`, `.kicad_pro` `083a4366`, `.kicad_dru` `b572915f` |
+| 2 ERC | exit 5: 308 warnings, all `lib_symbol_issues` (symbol library `''`), 0 errors; 464 with 156 `footprint_link_issues` means the copy lost its library depth | `.kicad_sch` `9e895069`, `.kicad_pro` `f57efdda` |
+| 4 pin diff | exit 0: `errors=0 warnings=7 info=0`, header pins 32, GPIO pins in netlist 36, only power pins and `EN` unmapped | `.kicad_sch` `9e895069`, `core_pins.h` `aade4921` |
+| 5 DRC | exit 0: clean, 0 unconnected, 0 parity; zone fills current (same counts after refill) | `.kicad_pcb` `6ea53cfb`, `.kicad_sch` `9e895069`, `.kicad_pro` `f57efdda`, `.kicad_dru` `91765201` |
 
 ```bash
-A=~/projects/aquila; shasum -a 256 "$A"/hardware/aquila-fc/aquila-fc.kicad_{sch,pro,pcb,dru} "$A/firmware/main/app_config.h" | cut -c1-8,65-
+A=~/projects/aquila/hardware/boards/core; shasum -a 256 "$A"/eda/core.kicad_{sch,pro,pcb,dru} "$A/core_pins.h" | cut -c1-8,65-
 ```
 
 A row whose files all hash as recorded but whose result differs: the new KiCad changed a check or a report shape; find which before bumping. A row with a changed file: the project changed since, not KiCad; compare that row by hand.
@@ -148,7 +158,7 @@ B=hardware/<b>
 python3 "${CLAUDE_SKILL_DIR}/scripts/pin_diff.py" --netlist "$B/review/board.net" --header <pins:> --mcu <mcu:> > "$B/review/pin_diff.txt"; echo "exit $?"; cat "$B/review/pin_diff.txt"
 ```
 
-The table is kept in `review/pin_diff.txt` for the step-7 manifest. Exit 2 means at least one error row; paste the table. Exit 1 is misuse or a file it could not parse. The header contract is flat `#define PIN_* <int>` lines (aquila's `app_config.h`); a header with `#if` branches or struct initialisers (athena's `board_pins.h`) is out of scope: say so and ask for a flat header or a `--pinmap`. KiCad 10 netlists write pin functions as `NAME_<pad>` (`USB_D-_13`); `pin_diff.py` strips the suffix, maps `IOn` by regex and `USB_D-`/`USB_D+`/`RXD0`/`TXD0` by built-in alias. If the unmapped line lists any of those four, stop and report. A symbol whose pin names carry no GPIO number needs `--pinmap pad,gpio`. Skip the step and say so when the project has no pin header yet.
+The table is kept in `review/pin_diff.txt` for the step-7 manifest. Exit 2 means at least one error row; paste the table. Exit 1 is misuse or a file it could not parse. The header contract is flat `#define PIN_* <int>` lines (aquila's `core_pins.h`); a header with `#if` branches or struct initialisers (athena's `board_pins.h`) is out of scope: say so and ask for a flat header or a `--pinmap`. KiCad 10 netlists write pin functions as `NAME_<pad>` (`USB_D-_13`); `pin_diff.py` strips the suffix, maps `IOn` by regex and `USB_D-`/`USB_D+`/`RXD0`/`TXD0` by built-in alias. If the unmapped line lists any of those four, stop and report. A symbol whose pin names carry no GPIO number needs `--pinmap pad,gpio`. Skip the step and say so when the project has no pin header yet.
 
 ### 5. DRC
 
