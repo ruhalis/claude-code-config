@@ -1,6 +1,6 @@
 ---
 name: fast-executor
-description: Efficient executor on Sonnet for well-specified, mechanical work - boilerplate generation, writing straightforward tests, formatting and lint fixes, renames, simple edits across files, config tweaks, repetitive refactors with a clear pattern. Give it precise instructions (files, pattern to follow, acceptance check) and it executes quickly. Not for open-ended design, ambiguous requirements, or debugging subtle issues.
+description: Efficient executor on Sonnet for well-specified, mechanical work whose shape is already decided - boilerplate generation, writing straightforward tests, formatting and lint fixes, renames, patterned edits across files, config tweaks, repetitive refactors with a clear pattern. Give it precise instructions (files, pattern to follow, acceptance check) and it executes quickly without making design choices. Not for a part that still needs local design choices (implementer), open-ended design, ambiguous requirements or debugging subtle issues (deep-reasoner), or running the full suite (verifier).
 model: sonnet
 effort: medium
 maxTurns: 60
