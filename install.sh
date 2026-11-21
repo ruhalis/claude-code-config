@@ -14,7 +14,7 @@ set -euo pipefail
 #
 # Layout:
 #   core/          source of truth: agents and skills
-#   adapters/claude/  CLAUDE.md + settings.json + keybindings.json (both merged) + hooks/
+#   adapters/claude/  CLAUDE.md + settings.json + keybindings.json (both merged) + hooks/ + bin/clangd
 #   adapters/vscode/  extensions.txt + settings.json (merged)
 #   scripts/       skill lint, bench, cleanup
 
@@ -280,6 +280,16 @@ install_claude() {
         link "$REPO_DIR/adapters/claude/hooks/$h" "$dir/hooks/$h"
         [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/hooks/$h"
     done
+
+    # clangd wrapper. The clangd-lsp plugin starts the first `clangd` on PATH with
+    # a fixed command line, so this one has to come before the system clangd:
+    # ~/.local/bin must sit ahead of /usr/bin on PATH. In a workspace that holds
+    # an ESP-IDF project it runs Espressif's clangd with --query-driver; anywhere
+    # else, the system clangd unchanged.
+    mk "$HOME/.local/bin"
+    backup "$HOME/.local/bin/clangd" claude
+    link "$REPO_DIR/adapters/claude/bin/clangd" "$HOME/.local/bin/clangd"
+    [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/bin/clangd"
 
     # instructions
     backup "$dir/CLAUDE.md" claude

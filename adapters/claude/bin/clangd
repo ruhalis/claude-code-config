@@ -1,0 +1,80 @@
+#!/bin/bash
+# clangd wrapper for Claude Code's clangd-lsp plugin.
+#
+# The plugin always starts the first `clangd` on PATH with a fixed command line (just
+# --background-index), so there is no setting for choosing the binary or adding flags. This
+# script sits ahead of the system clangd on PATH and picks the binary by the workspace:
+#
+#   - Workspace (the current directory) holds an ESP-IDF project, i.e. a sdkconfig.defaults or
+#     sdkconfig within a few directory levels: run Espressif's clangd (newest esp-clang under
+#     ~/.espressif/tools) with --query-driver for the Xtensa/RISC-V cross compilers, so it can
+#     read their newlib include paths. Apple's clangd cannot do that, and --query-driver can only
+#     be given on the command line. The project still needs a .clangd that removes the GCC-only
+#     -f*/-m* flags and a build/compile_commands.json from one `idf.py build`.
+#     The same esp-clang also serves the workspace's host C/C++ files. Its default target is
+#     riscv32-esp-elf and it knows no macOS SDK, so the system compiler directories are on the
+#     --query-driver list too: clangd then asks cc/c++/clang there for the host headers and target.
+#   - Anything else, or esp-clang not installed: run the system clangd unchanged.
+#
+# All arguments pass through untouched. Nothing may be printed on stdout: it is the LSP channel.
+set -u
+
+self=$0
+
+# Search depth below the workspace: depth 2 is <ws>/firmware/sdkconfig.defaults, 3 one app
+# deeper (<ws>/firmware/dongle/sdkconfig.defaults).
+idf_depth=3
+
+workspace_has_idf_project() {
+  local hit
+  hit=$(find "$PWD" -mindepth 1 -maxdepth "$idf_depth" \
+    \( -type d \( -name '.*' -o -name build -o -name 'build_*' -o -name node_modules \
+       -o -name managed_components -o -name third_party -o -name vendor -o -name venv \
+       -o -name __pycache__ -o -name target -o -name dist -o -name site-packages \
+       -o -name Library -o -name Applications -o -name System -o -name Volumes -o -name proc \) -prune \) \
+    -o \( -type f \( -name sdkconfig.defaults -o -name sdkconfig \) -print -quit \) 2>/dev/null)
+  [ -n "$hit" ]
+}
+
+newest_esp_clangd() {
+  local c newest=""
+  local n=0
+  for c in "$HOME"/.espressif/tools/esp-clang/*/esp-clang/bin/clangd; do
+    [ -x "$c" ] || continue
+    newest=$c
+    n=$((n + 1))
+  done
+  if [ "$n" -gt 1 ]; then
+    newest=$(printf '%s\n' "$HOME"/.espressif/tools/esp-clang/*/esp-clang/bin/clangd | sort -V | tail -n 1)
+  fi
+  [ -n "$newest" ] && printf '%s\n' "$newest"
+}
+
+system_clangd() {
+  local d IFS=:
+  if [ -x /usr/bin/clangd ] && ! [ /usr/bin/clangd -ef "$self" ]; then
+    printf '%s\n' /usr/bin/clangd
+    return 0
+  fi
+  for d in $PATH; do
+    [ -n "$d" ] || continue
+    if [ -f "$d/clangd" ] && [ -x "$d/clangd" ] && ! [ "$d/clangd" -ef "$self" ]; then
+      printf '%s\n' "$d/clangd"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if workspace_has_idf_project; then
+  esp=$(newest_esp_clangd)
+  if [ -n "$esp" ]; then
+    exec "$esp" --query-driver="$HOME/.espressif/tools/**,/usr/bin/*,/Library/Developer/CommandLineTools/usr/bin/*" "$@"
+  fi
+fi
+
+sys=$(system_clangd) || {
+  echo "clangd wrapper: no clangd found (no esp-clang for this workspace, none on PATH besides $self)" >&2
+  exit 127
+}
+exec "$sys" "$@"
