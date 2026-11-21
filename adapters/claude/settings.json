@@ -22,13 +22,20 @@
     "kicad-happy@kicad-happy": true,
     "nvidia-skills@claude-plugins-official": true,
     "pdf-viewer@knowledge-work-plugins": true,
-    "plugin-dev@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
     "rea@rea": true,
+    "session-report@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "text-to-cad@text-to-cad": true
+    "text-to-cad@earthtojake": true
   },
   "extraKnownMarketplaces": {
+    "earthtojake": {
+      "source": {
+        "source": "github",
+        "repo": "earthtojake/text-to-cad",
+        "ref": "latest"
+      }
+    },
     "kicad-happy": {
       "source": {
         "source": "github",

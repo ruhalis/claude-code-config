@@ -1,7 +1,7 @@
 ---
 name: pcb-enclosure
 description: Design enclosures, cases, lids, mounts, brackets and standoffs for the user's own PCBs (ESP32 boards for Athena and Aquila) and prepare them for FDM printing. Exports the real board geometry from KiCad with kicad-cli on one shared datum (board outline and holes STEP, connector STEP, placement CSV, outline DXF), supplies the user's FDM fit tolerances and a numeric fit-check script. All modeling is deferred to the text-to-cad plugin's cad skill (build123d through the `cad` command). Use whenever the user mentions an enclosure, case, housing, box, lid, mount, bracket, standoff, 3D print, STL, 3MF, STEP, build123d, cadgen, `cad run`, fitting a board or printing a part. Not for schematic or PCB review (kicad-review), changing a board (pcb-author) or firmware (esp-idf).
-compatibility: macOS, KiCad 10 app bundle (kicad-cli 10.0.5), the text-to-cad Claude Code plugin 0.11.x (`text-to-cad@text-to-cad`, from the local catalog in `~/Library/Application Support/cad/plugin`; the CAD server installs patch releases by itself). Network only for the first install and the integrations `cad` fetches on first use.
+compatibility: macOS, KiCad 10 app bundle (kicad-cli 10.0.5), the text-to-cad Claude Code plugin 0.11.x (`text-to-cad@earthtojake`, from the GitHub marketplace `earthtojake/text-to-cad`; the CAD server installs patch releases by itself). Network only for the first install and the integrations `cad` fetches on first use.
 ---
 
 # PCB enclosure
