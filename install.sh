@@ -286,10 +286,20 @@ install_claude() {
     # ~/.local/bin must sit ahead of /usr/bin on PATH. In a workspace that holds
     # an ESP-IDF project it runs Espressif's clangd with --query-driver; anywhere
     # else, the system clangd unchanged.
-    mk "$HOME/.local/bin"
-    backup "$HOME/.local/bin/clangd" claude
-    link "$REPO_DIR/adapters/claude/bin/clangd" "$HOME/.local/bin/clangd"
-    [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/bin/clangd"
+    # ~/.local/bin is shared, unlike ~/.claude: a clangd already there that is not
+    # this repo's link (a real binary, or a link to one) may be the machine's only
+    # clangd, so it is left alone instead of backed up. A dangling link there is
+    # nobody's clangd (this repo's old path after a rename) and is replaced.
+    local wrapper_dst="$HOME/.local/bin/clangd"
+    if [ -e "$wrapper_dst" ] \
+        && [[ "$(readlink "$wrapper_dst" 2>/dev/null)" != "$REPO_DIR"/* ]]; then
+        warn "$wrapper_dst is another clangd, not this repo's wrapper; left alone. To use the wrapper, move it to a directory later on PATH (the wrapper falls back to /usr/bin/clangd, then the next clangd on PATH) and re-run."
+    else
+        mk "$HOME/.local/bin"
+        backup "$wrapper_dst" claude
+        link "$REPO_DIR/adapters/claude/bin/clangd" "$wrapper_dst"
+        [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/bin/clangd"
+    fi
 
     # instructions
     backup "$dir/CLAUDE.md" claude
