@@ -2,7 +2,8 @@
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "MCP_TIMEOUT": "90000",
-    "CAD_TELEMETRY": "0"
+    "CAD_TELEMETRY": "0",
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/agent-rows"
   },
   "enableWorkflows": true,
   "statusLine": {
@@ -119,10 +120,6 @@
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "remoteControlAtStartup": true,
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "~/.claude/subagent-statusline.sh"
-  },
   "subagentPromptCacheTtl": "1h",
   "permissions": {
     "deny": [

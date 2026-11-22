@@ -90,7 +90,9 @@ copy() {  # copy <src> <dst>
 # jq programs for merge_json; input is `jq -s live repo`.
 # Settings: repo wins recursively (arrays are replaced); live-only keys survive;
 # the four keys Claude Code writes itself keep their live value when live has them.
-JQ_SETTINGS='(.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))'
+# Retired keys are deleted last: the merge alone would keep a key the repo no
+# longer declares. subagentStatusLine is deprecated in favour of mods (agent-rows).
+JQ_SETTINGS='((.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))) | del(.subagentStatusLine)'
 # Keybindings: per context, live blocks then repo blocks, repo winning per key.
 JQ_KEYBINDINGS='(.[0] * .[1]) + {bindings: ((((.[0].bindings // []) + (.[1].bindings // [])) | group_by(.context)) | map({context: .[0].context, bindings: (map(.bindings) | add)}))}'
 # VS Code settings: repo wins on the keys it declares; every live-only key survives.
@@ -265,10 +267,19 @@ install_claude() {
     link "$REPO_DIR/statusline" "$dir/statusline"
     [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/statusline/statusline.sh"
 
-    # subagent status line: the agent-panel row body (type, model, effort)
+    # mods (hooks modules), loaded through CLAUDE_CODE_PLUGIN_DIRS in
+    # settings.json's env, which names each link below. agent-rows draws the
+    # agent-list row body (type, model, effort); it replaced the script behind
+    # the deprecated subagentStatusLine setting, whose link is cleared here.
     backup "$dir/subagent-statusline.sh" claude
-    link "$REPO_DIR/adapters/claude/subagent-statusline.sh" "$dir/subagent-statusline.sh"
-    [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/subagent-statusline.sh"
+    mk "$dir/mods"
+    local m
+    for m in "$REPO_DIR"/adapters/claude/mods/*/; do
+        [ -d "$m" ] || continue
+        m="${m%/}"
+        backup "$dir/mods/${m##*/}" claude
+        link "$m" "$dir/mods/${m##*/}"
+    done
 
     # hooks, wired in settings.json: the main-session guard (PreToolUse on Bash),
     # the KiCad guard (PreToolUse on Edit, Write and Bash; Fable-only writes)

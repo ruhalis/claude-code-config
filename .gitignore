@@ -8,3 +8,7 @@ Claude outputs/
 
 # Anthropic's claude.ai account skill, restored from a local copy; not ours to publish
 core/skills/deep-research/
+
+# written by Claude Code into a mod's folder when it loads the mod
+adapters/claude/mods/*/.claude-plugin/types/
+adapters/claude/mods/*/tsconfig.json

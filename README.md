@@ -28,7 +28,7 @@ core/                  source of truth: agents and skills
   skills/pcb-author/     the only write path for a board: Zener sources and Diode's pcb CLI, Fable only (Claude Code only; carries Diode's five skills as references, MIT, pinned in SKILL.md)
   skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code: uses Agent and Artifact)
 adapters/
-  claude/                CLAUDE.md + settings.json + keybindings.json + subagent-statusline.sh + hooks/
+  claude/                CLAUDE.md + settings.json + keybindings.json + hooks/ + mods/
   vscode/                extensions.txt — extension IDs to install; settings.json — user settings (merged)
 scripts/               bench.sh, check-skills.sh, cleanup.sh
 statusline/            submodule (Claude-only)
@@ -46,7 +46,7 @@ statusline/            submodule (Claude-only)
 | Statusline | `statusline/` (submodule) |
 | Hooks | `~/.claude/hooks/guard-main-session.sh`, `~/.claude/hooks/guard-git-write.sh` and `~/.claude/hooks/guard-kicad-edit.sh` (symlinks to `adapters/claude/hooks/`) |
 | clangd wrapper | `~/.local/bin/clangd` (symlink to `adapters/claude/bin/clangd`; `~/.local/bin` must come before `/usr/bin` on `PATH`; a clangd already at that path that is not this link is left alone with a warning). The `clangd-lsp` plugin starts the first `clangd` on `PATH` with a fixed command line, so the wrapper picks the binary by workspace: with an ESP-IDF project (`sdkconfig` or `sdkconfig.defaults` up to three levels down) it runs Espressif's clangd from `~/.espressif/tools/esp-clang` with `--query-driver` for the cross compilers and the system compilers; anywhere else, or without esp-clang, the system clangd unchanged. The project still needs a `.clangd` that removes the GCC-only `-f*`/`-m*` flags and one `idf.py build` for `build/compile_commands.json` |
-| Subagent rows | `~/.claude/subagent-statusline.sh` (symlink to `adapters/claude/subagent-statusline.sh`): the agent panel shows `type model effort · task · tokens` per running subagent, wired by `subagentStatusLine` in settings.json |
+| Subagent rows | `~/.claude/mods/agent-rows` (symlink to `adapters/claude/mods/agent-rows`): a mod whose `AgentRow` render hook makes the agent list show `type model effort · task · tokens` per running subagent, loaded through `CLAUDE_CODE_PLUGIN_DIRS` in the `env` of settings.json. It replaced the `subagentStatusLine` setting, which Claude Code deprecated in favour of mods; check it with `claude plugin validate` and `claude plugin test` on the folder |
 
 Symlinked items track repo edits live. The two copies — `settings.json` and `keybindings.json` — are copies precisely because Claude Code rewrites `settings.json` in place when you change the theme or model, and a symlink would push those edits back into the repo. Re-run `install.sh` to update them: it backs up the live file, then merges the repo over it, so the repo wins on every key it declares and the live file keeps the rest, with `model`, `modelSettings`, `effortLevel` and `autoMode` staying as Claude Code last wrote them (the repo only seeds them when absent). A key removed from the repo is not removed from the live file because the merge never deletes, so remove it by hand or with `/config`. If `jq` is missing, or a live file cannot be merged (invalid JSON, or a top level that is not an object), `install.sh` stops before it changes anything; it never replaces a live file it could not merge.
 
