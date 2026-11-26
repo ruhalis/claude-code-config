@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Lint the skills in core/skills. Needs only bash and python3's standard
-# library, and changes no file.
+# Lint the skills in core/skills and core/optional-skills. Needs only bash and
+# python3's standard library, and changes no file.
 #
 #   scripts/check-skills.sh                   every skill, then the project references
 #   scripts/check-skills.sh esp-idf isaac     just these skills (references too)
@@ -26,9 +26,14 @@
 #   - a file a script reads as ${SKILL_DIR}/<file> (the version pins) that is missing
 # and warns, without failing, on __pycache__, *.pyc or .DS_Store inside a skill.
 #
-# Then every ~/.claude/skills/<name>/<path> in the *.md files under
-# ~/projects must resolve in core/skills, since other repos call bundled scripts
-# by those paths.
+# Then the skill paths in the *.md files under ~/projects must resolve, since other
+# repos call bundled scripts by those paths (this repo's dated reports/ and
+# research_notes/ are skipped):
+#   - ~/.claude/skills/<name>/<path> in core/skills. A global path to an optional
+#     skill FAILs: those are linked only as <project>/.claude/skills/<name>.
+#   - a project path .claude/skills/<name>/<path> to an optional skill in
+#     core/optional-skills, and the project must be one projects.txt names for it.
+#     A project path to a skill this repo doesn't have is the project's own; skipped.
 #
 # Exit 1 if anything failed.
 set -euo pipefail
@@ -48,12 +53,13 @@ from pathlib import Path
 
 REPO = Path(os.environ["REPO_DIR"])
 SKILLS = REPO / "core" / "skills"
+OPTIONAL = REPO / "core" / "optional-skills"
 HOME = Path.home()
 SPEC_KEYS = ["name", "description", "license", "compatibility", "metadata", "allowed-tools"]
 NAME_RE = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 NOT_PACKAGED = {"__pycache__", "node_modules"}
 
-ap = argparse.ArgumentParser(prog="check-skills.sh", description="Lint core/skills.")
+ap = argparse.ArgumentParser(prog="check-skills.sh", description="Lint core/skills and core/optional-skills.")
 ap.add_argument("skills", nargs="*", help="skill directory names (default: all)")
 ap.add_argument("-q", "--quiet", action="store_true", help="print only problems and a summary")
 ap.add_argument("--no-refs", action="store_true", help="skip the project reference scan")
@@ -249,9 +255,8 @@ def run(cmd, cwd):
         return None, "timed out after 20 s"
 
 
-def check_skill(skill):
+def check_skill(skill, root):
     """-> (status, summary, [(level, message)])"""
-    root = SKILLS / skill
     problems = []
     fail = lambda m: problems.append(("FAIL", m))
     warn = lambda m: problems.append(("warn", m))
@@ -329,16 +334,31 @@ def check_skill(skill):
 
 # ---- references from other repos ----
 
-REF_RE = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/Users/[^/\s`'\"]+)/\.claude/skills/"
-                    r"([\w.-]+)((?:/[\w.@+-]*)*)")
+# group 1: what comes before .claude/skills/ on the same path (empty for a relative path)
+REF_RE = re.compile(r"((?:[^\s`'\"()\[\]<>|,;]*/)?)\.claude/skills/([\w.-]+)((?:/[\w.@+-]*)*)")
+HOME_RE = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/Users/[^/]+|/home/[^/]+)/")
 PRUNE = {".git", "node_modules", ".venv", "venv", "__pycache__", "build", "managed_components"}
+PRUNE_PATHS = {REPO / "reports", REPO / "research_notes"}  # dated notes, not live references
 
 
-def scan_refs(root, names):
+def project_map():
+    """optional skill -> the project directories projects.txt links it into"""
+    out = {}
+    f = OPTIONAL / "projects.txt"
+    for line in f.read_text().split("\n") if f.is_file() else []:
+        words = line.split()
+        if words and not words[0].startswith("#"):
+            out[words[0]] = [Path(os.path.expanduser(w)) for w in words[1:]]
+    return out
+
+
+def scan_refs(root, names, optional):
     ok, bad = 0, []
     files = set()
+    linked = project_map()
+    where = lambda name: ", ".join(tilde(p) for p in linked.get(name, [])) or "no project yet"
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in PRUNE)
+        dirnames[:] = sorted(d for d in dirnames if d not in PRUNE and Path(dirpath, d) not in PRUNE_PATHS)
         for fn in sorted(filenames):
             if not fn.endswith(".md"):
                 continue
@@ -349,17 +369,37 @@ def scan_refs(root, names):
                 continue
             for n, line in enumerate(lines, 1):
                 for m in REF_RE.finditer(line):
-                    name, rest = m.groups()
+                    prefix, name, rest = m.groups()
                     ref = m.group(0).rstrip(".")
                     rest = rest.rstrip(".").strip("/")
                     if name.startswith(".") or name == "synced":
                         continue
-                    if name not in names:
-                        bad.append(f"{tilde(p)}:{n} {ref}: no core/skills/{name}")
-                        continue
+                    at = f"{tilde(p)}:{n} {ref}"
+                    if HOME_RE.fullmatch(prefix):  # the global skills folder
+                        if name in optional:
+                            bad.append(f"{at}: {name} is an optional skill now, in core/optional-skills/{name}, "
+                                       f"reached as <project>/.claude/skills/{name}/ in {where(name)} (projects.txt)")
+                            continue
+                        if name not in names:
+                            bad.append(f"{at}: no core/skills/{name}")
+                            continue
+                        base = SKILLS / name
+                    elif name in optional:  # a project's own skills folder
+                        # the project: the path's own prefix, else the top folder of the file under the
+                        # scan root; unknown for a shell expression such as $(git rev-parse ...)/.
+                        # This repo's files describe the layout and name no project.
+                        proj = (Path(os.path.expanduser(prefix.rstrip("/"))) if re.match(r"[~/].", prefix)
+                                else root / p.relative_to(root).parts[0] if not prefix else None)
+                        if (proj and proj.is_dir() and proj.resolve() != REPO.resolve()
+                                and proj.resolve() not in {d.resolve() for d in linked.get(name, []) if d.is_dir()}):
+                            bad.append(f"{at}: projects.txt does not link {name} into {tilde(proj)} (only {where(name)})")
+                            continue
+                        base = OPTIONAL / name
+                    else:
+                        continue  # the project's own skill, not this repo's
                     files.add(p)
-                    if rest and not (SKILLS / name / rest).exists():
-                        bad.append(f"{tilde(p)}:{n} {ref}: no {rest} in core/skills/{name}")
+                    if rest and not (base / rest).exists():
+                        bad.append(f"{at}: no {rest} in {base.relative_to(REPO)}")
                     else:
                         ok += 1
     return ok, bad, len(files)
@@ -367,19 +407,28 @@ def scan_refs(root, names):
 
 # ---- main ----
 
-all_skills = sorted(d.name for d in SKILLS.iterdir() if d.is_dir() and not d.name.startswith("."))
-chosen = args.skills or all_skills
-unknown = [s for s in chosen if s not in all_skills]
+def skill_dirs(base):
+    return {d.name: d for d in base.iterdir() if d.is_dir() and not d.name.startswith(".")} if base.is_dir() else {}
+
+
+global_skills, optional_skills = skill_dirs(SKILLS), skill_dirs(OPTIONAL)
+roots = {**optional_skills, **global_skills}
+chosen = args.skills or sorted(global_skills) + sorted(optional_skills)
+unknown = [s for s in chosen if s not in roots]
 if unknown:
-    sys.exit(f"check-skills: no core/skills/{unknown[0]}")
+    sys.exit(f"check-skills: no core/skills/{unknown[0]} or core/optional-skills/{unknown[0]}")
 
 counts = {"ok": [], "warn": [], "FAIL": []}
 for skill in chosen:
-    status, summary, problems = check_skill(skill)
+    status, summary, problems = check_skill(skill, roots[skill])
+    if skill in global_skills and skill in optional_skills:
+        problems.append(("FAIL", "in both core/skills and core/optional-skills"))
+        status = "FAIL"
     counts[status].append(skill)
     if args.quiet and status == "ok":
         continue
-    print(f"{status:<5} {skill:<24} {summary}")
+    label = skill if skill in global_skills else f"{skill} (optional)"
+    print(f"{status:<5} {label:<24} {summary}")
     for level, msg in problems:
         print(f"        {level}: {msg}")
 
@@ -389,7 +438,7 @@ if not args.no_refs:
     if not root.is_dir():
         refs_note = f"; no {tilde(root)}, references not checked"
     else:
-        ok, bad, nfiles = scan_refs(root, set(all_skills))
+        ok, bad, nfiles = scan_refs(root, set(global_skills), set(optional_skills))
         if bad:
             counts["FAIL"].append("project refs")
             print(f"{'FAIL':<5} {'project refs':<24} {len(bad)} of {ok + len(bad)} skill paths under {tilde(root)} do not resolve")

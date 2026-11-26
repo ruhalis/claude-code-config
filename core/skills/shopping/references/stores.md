@@ -2,14 +2,14 @@
 
 What each store is good for, how to read it, and what is known about shipping to Kazakhstan. Checked 2026-11-06 from a Kazakh IP unless noted; [v] = verified directly, [s] = second-hand. Store behaviour changes: when a read fails or a policy differs, note it with the date in `~/.claude/shopping/profile.md`, and update this file when the change holds.
 
-Read methods: **page** = `listing.py page <url>` (JSON-LD or OpenGraph or inline JSON); **kaspi** = `listing.py kaspi`; **shopify** = `listing.py shopify` (untested live); **browser** = read-only in Chrome; **API** = the kicad-happy distributor skill.
+Read methods: **page** = `listing.py page <url>` (JSON-LD or OpenGraph or inline JSON); **kaspi** = `listing.py kaspi`; **shopify** = `listing.py shopify` (untested live); **browser** = read-only in Chrome.
 
 ## Kazakh stores
 
 | Store | Good for | Read | Notes |
 |---|---|---|---|
 | Kaspi.kz | General goods, electronics; many merchants per product | **kaspi** with the product id and city id [v] | Product and search pages carry no price in static HTML. Find product ids with WebSearch (`site:kaspi.kz/shop/p <query>`) or the browser. The offers endpoint is undocumented: if it breaks, read the product page in the browser. Prices and delivery depend on the city. |
-| Satu.kz | Small sellers: modules, components, LiPo packs, tools, consumables | **page** on search and product pages, JSON-LD in KZT [v] | The most machine-readable Kazakh source; a search page holds about 10 products. Nationwide delivery depends on the seller. |
+| Satu.kz | Small sellers: modules, components, LiPo packs, tools, consumables | **page** on product pages, JSON-LD in KZT [v]; search pages are JS-rendered, so find products with WebSearch or the browser (2026-11-12) | Nationwide delivery depends on the seller. |
 | Technodom | Electronics, appliances, tools | **page** on product pages (JSON-LD) and catalog pages (prices in HTML) [v] | The search page is client-rendered: use catalog pages or the browser. Prices and stock vary by city. |
 | Wildberries KZ | General goods | **browser** only: curl gets 498/403 [v] | Goods are inside the EAEU, so no customs. |
 | Ozon KZ | General goods | **browser** only: bot-challenge redirect [v] | Goods are inside the EAEU, so no customs. |
@@ -21,7 +21,7 @@ Read methods: **page** = `listing.py page <url>` (JSON-LD or OpenGraph or inline
 | Store | Good for | Read | Notes |
 |---|---|---|---|
 | AliExpress | Almost anything, FPV parts, tools | **browser** only: curl gets a bot-wall redirect [v] | A Kazakh IP is redirected to aliexpress.ru [v]. Clones are common: check the store's rating, sales and age, and compare specs with the manufacturer. |
-| Banggood | RC/FPV, tools, gadgets | **page**: USD price in inline JSON, rouble price in og:description [v] | Kazakhstan is served via ru.banggood.com [v]. |
+| Banggood | RC/FPV, tools, gadgets | **page** on product pages: USD price in inline JSON, rouble price in og:description [v]; search pages are JS-rendered (2026-11-12) | Kazakhstan is served via ru.banggood.com [v]. |
 | Temu | Cheap general goods | Untested | Operating in Kazakhstan since 2024 [s]. |
 
 ## Foreign specialist stores
@@ -31,7 +31,7 @@ Read methods: **page** = `listing.py page <url>` (JSON-LD or OpenGraph or inline
 | Pololu | Robotics: motors, drivers, sensors | **page**, JSON-LD in USD [v] | Not stated in its shipping doc [v]. |
 | Adafruit | Electronics, sensors, dev boards | **page**, JSON-LD in USD [v] | Listed, but some products can't go to some listed countries [v]. |
 | SparkFun | Electronics, sensors | Untested; try **page** | Export page doesn't mention KZ; restrictions are per product [v]. |
-| DigiKey, Mouser, LCSC, element14 | Components with an MPN | **API** via kicad-happy | DigiKey reportedly lists KZ [s]; LCSC ships by DHL/FedEx [s]; Mouser's site blocks automation [v]. |
+| DigiKey, Mouser, LCSC, element14 | Components with an MPN | No script method tested: try **page**, then the browser | DigiKey reportedly lists KZ [s]; LCSC ships by DHL/FedEx [s]; Mouser's site blocks automation [v]. |
 | RaceDayQuads | FPV | Shopify; **shopify** untested. HTTP 429 after about 6 requests [v] | Unknown. It publishes agent rules at `/agents.md` (and a UCP endpoint); read those before reading the store. |
 | Pyrodrone | FPV | Shopify; **shopify** untested; 429s [v] | International by DHL Express; no country list [v]. |
 | Holybro (direct) | Flight controllers, GPS, telemetry, frames | Shopify; 429s [v] | KZ is not on its embargo list, but its code of conduct forbids routing via intermediaries, so no forwarders [v]. Paused overseas export in June 2025, no resumption found [v/s]. Ships from China, DAP: buyer pays duties [v]. |

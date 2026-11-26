@@ -1,8 +1,8 @@
 # Run log for Isaac Lab and repos without a ledger: entry template, run dirs, the Changed check
 
 Used by SKILL.md's record step when the repo keeps no ledger of its own (no `## Experiments` section in CLAUDE.md
-and no `Decision ledger`), typically an Isaac Lab rsl_rl / skrl run (cooper, berkley). aquila does not use this
-template: its record step is `aquila-map.md` §13 (manifest + gate file → ledger row + EVIDENCE §9). The rules that
+and no `Decision ledger`), typically an Isaac Lab rsl_rl / skrl run. A project with a ledger of its own records in that ledger's format
+instead. The rules that
 apply to every repo (one variable, task metric, noise floor, sim-to-real entry, frozen verdicts) are in SKILL.md;
 this file holds the template and the Isaac Lab mechanics.
 
@@ -38,7 +38,7 @@ Code is the task repo as checked out on the training host, not Isaac Lab; add `-
 The run-id is `<short-task-slug>-<NNN>` (e.g. `pick-ik-004`), where NNN is the highest number already in that log plus 1. Put it in the run dir's name:
 - rsl_rl: `--run_name <run-id>` gives `logs/rsl_rl/<experiment_name>/<YYYY-MM-DD_HH-MM-SS>_<run-id>` under the launch directory. With `--logger wandb` the W&B run takes that directory's name, the project is `--log_project_name` (agent.yaml `wandb_project`), the entity `$WANDB_USERNAME` or the account default.
 - skrl: the Hydra override `agent.agent.experiment.experiment_name=<run-id>` gives `logs/skrl/<experiment.directory>/<timestamp>_<algo>_<ml_framework>_<run-id>`.
-- A custom trainer (e.g. aquila's, which records differently: `aquila-map.md` §13): Run dir is wherever it writes.
+- A custom trainer: Run dir is wherever it writes.
 
 ## 3. Filling and checking it from the config dump
 
@@ -85,7 +85,7 @@ A filled entry from cooper's history, before it kept a log (abridged; run-ids il
 - DR: robot + object friction (30, 30) at startup; cube reset x/y ±0.03 m
 - Seed(s): ? (42 without --seed), one run
 - Command: OMNI_KIT_ACCEPT_EULA=YES ~/isaac/venv/bin/python sim/rl/train_rl.py --task Isaac-Pick-MyCobot280-RL-v0 --headless --num_envs 2048 --run_name pick-rl-003
-- Run dir: ?:/home/rassul_pc/cooper/logs/rsl_rl/mycobot280_pick/2026-06-??_??-??-??_pick-rl-003
+- Run dir: ?:~/cooper/logs/rsl_rl/mycobot280_pick/2026-06-??_??-??-??_pick-rl-003
 - Expected: rollout "envs that EVER lifted" above 0/32 by the final checkpoint
 - Result: sim/diagnostics/rollout_pick_policy.py, model_?.pt, Play env, 32 envs × 260 steps, deterministic: "envs that EVER lifted cube >50mm : 0/32" (Episode_Reward/lifting_object 0.28 while injecting, 0.009 after); wall ?, RTX 5080
 - Verdict: inconclusive — confounded, one seed, 0/32 on both sides

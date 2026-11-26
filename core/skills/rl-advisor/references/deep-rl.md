@@ -70,16 +70,16 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   critic loss ½(Q − y)²; actor loss E[α log π(a|s) − min_i Q_i(s,a)] with the reparameterised
   a = tanh(μ + σ ε); tanh log-prob correction log π(a|s) = log N(u) − Σ log(1 − tanh(u)²);
   temperature loss J(α) = E[−α (log π(a|s) + H̄)] with target entropy H̄ = −dim(A). Lineage: soft
-  Q-learning (Haarnoja et al. 2017 ICML), max-ent IRL (Ziebart et al. 2008 AAAI). aquila's teachers
-  are exactly this recipe as transcribed from rl-tools (`aquila-map.md` §2: the entropy bonus in the
-  target is unconditional, actor every 2nd step, polyak 0.995, log α init log 0.5).
+  Q-learning (Haarnoja et al. 2017 ICML), max-ent IRL (Ziebart et al. 2008 AAAI). Transcriptions differ in
+  details that matter (whether the entropy bonus enters the target, the actor update interval, polyak, the
+  initial α, the target entropy); read them from the project's code before reasoning about its run.
 - **Which to use**: SAC for sample-efficient continuous control with modest action dims; TD3 when the
   entropy term hurts (precise control, where the stochastic policy's noise is the problem); PPO when
   the simulator is cheap and massively parallel (Isaac Lab), since wall-clock beats sample efficiency
   there (Rudin et al. 2021 CoRL).
 - Breaks on: temperature collapse or runaway (watch α and the policy entropy; a target entropy of −|A|
-  is a heuristic, not a law; aquila's `log_alpha` is in every teacher file), critic divergence late in
-  training (aquila §6.5: 69 of 1000 teachers finished > 100 below their best; 15 below the gate),
+  is a heuristic, not a law; log α with every checkpoint), critic divergence late in
+  training (a converged population can lose a few percent of members below their best; §13),
   reward scale (SAC is sensitive: the entropy term is in reward units), action bounds (tanh squashing
   + the Jacobian term is not optional), replay ratio > 1 without resets (§13).
 
@@ -107,7 +107,7 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   2024 ICLR).
 - When the model is wrong (S&B 8.3) is still the issue: exploitation of model errors by the planner;
   ensembles, short horizons and pessimism (MOPO/MOReL for offline) are the standard guards. For a
-  robot with a cheap, faithful simulator (aquila's L2F port, Isaac Lab), the simulator *is* the model,
+  robot with a cheap, faithful simulator (a golden-tested port, Isaac Lab), the simulator *is* the model,
   and model-free on it is the pragmatic choice.
 
 ## 6. Exploration
@@ -142,17 +142,16 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   student drifts to states the expert never visited (Ross & Bagnell 2010 AISTATS). **DAgger** (Ross,
   Gordon, Bagnell 2011 AISTATS): iterate — roll out the mixture π_i = β_i π* + (1 − β_i) π̂_i, label the
   visited states with the expert, aggregate, retrain; a no-regret reduction with O(T ε) cost. β_1 = 1
-  (pure expert, "teacher forcing"), then β_i → 0 fast; the original uses β_i = p^{i−1} or β_i = 1{i=1}.
-  aquila: 10 teacher-forcing epochs then 990 student-driven epochs, labels from the per-frame teacher
-  (`aquila-map.md` §6). Its instability mode: the on-policy loop oscillates with period 2 (the student
-  trained on epoch k's states is different at epoch k+1, so the state distribution flips) — measured
-  in aquila EVIDENCE §8.0 (lag-2 autocorrelation > lag-1 on 5 of 7 runs); damping levers are
+  (pure expert, "teacher forcing"), then β_i → 0 fast; the original uses β_i = p^{i−1} or β_i = 1{i=1}
+  (a few teacher-forcing epochs, then student-driven). Its instability mode: the on-policy loop oscillates
+  with period 2 (the student trained on epoch k's states is different at epoch k+1, so the state
+  distribution flips; lag-2 autocorrelation of the per-epoch metric exceeds lag-1); damping levers are
   dataset windows across epochs, LR decay, EMA of the student. The guarantee is also the bound: under
   DAgger the student's cost is bounded by its imitation loss on its *own* state distribution times the
   horizon (Ross, Gordon, Bagnell 2011), so where the expert's labels are wrong the bound is on matching
   wrong labels, and no amount of exposure trains the student toward a regime where the teachers flail.
   A recurrent student can still *generalise* past memoryless teachers through system identification, but
-  it cannot be *taught* past them (aquila L08/L11, EVIDENCE §3–4; `diagnostics.md` §4).
+  it cannot be *taught* past them (`diagnostics.md` §4).
 - **Policy distillation** (Rusu et al. 2016 ICLR: many teachers → one student, KL on action
   distributions), **GAIL** (Ho & Ermon 2016 NeurIPS: adversarial occupancy matching), **privileged
   teacher–student** (Chen et al. 2019 CoRL "Learning by Cheating"; Lee et al. 2020 Science Robotics
@@ -160,24 +159,20 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   et al. 2021 RSS: a latent of the privileged params regressed from history), **asymmetric
   actor–critic** (Pinto et al. 2018 RSS: privileged critic, deployable actor — the cheap version when
   only training needs the privileged info).
-- **Foundation policies for control**: RAPTOR (Eschmann et al. 2025 arXiv, rl-tools; the recipe aquila
-  reproduces — 1000 SAC teachers on sampled dynamics, DAgger into a GRU(16) student that identifies
+- **Foundation policies for control**: RAPTOR (Eschmann et al. 2025 arXiv, rl-tools:
+  1000 SAC teachers on sampled dynamics, DAgger into a GRU(16) student that identifies
   the airframe from history; the student's latent recovers thrust-to-weight at R² ≈ 0.94–0.95).
-- **Standing lessons from aquila** (details and numbers in `aquila-map.md` §10):
-  - The student is a lossy compressor: ~3 % of airframes are sacrificed by the shared representation,
-    on a fixed low-authority tail that the teachers handle; capacity (GRU 16 → 24) moved the mean but
-    not the tail; oversampling the hard frames did move the tail.
-  - A student cannot be taught past its labels, but can generalise past them: the GRU student beats its
-    memoryless teachers under a rotor fault (517.8 vs 371.4 at 0.3) with no fault labels. Exposing it to
-    faults on which the clean teachers flail made it *worse* at faults at every level (clean-bank 0.2
-    pilot: −38 / −121). Retraining teachers on the harder env fixed the labels there but taxed the style
-    everywhere (d_action penalty on inherited busyness), and that cost transferred through distillation
-    while the thin benefit did not survive 2× imitation error (A3/A3b: −59…−82).
-  - Observation noise during distillation was the one big win (+147 @ trained magnitude, +288 held-out;
-    without it 705/1000 frames fail under sensor noise): the GRU "learned to filter, not react".
-    Constant per-episode bias was dead weight (position hold absorbs it).
-  - Selecting the shipped student by argmax over epochs picked a +2.4 sd draw; plateau averaging
-    (SWA/EMA) ranked first on most runs and held-out selection replaced the argmax.
+- **Teacher–student lessons** (one project's measurements; the numbers belong in that project's digest):
+  - The student is a lossy compressor: the shared representation can sacrifice a fixed hard tail the
+    teachers handle; more capacity may move the mean and not the tail, while oversampling the hard
+    cases can move the tail.
+  - Exposing a student to a regime where its teachers flail can make it worse there, and teachers
+    retrained for that regime can pass a style tax (an action-rate penalty on a busier style) through
+    distillation everywhere.
+  - Observation noise during distillation can be the single largest robustness win: the recurrent
+    student learns to filter, not react. Constant per-episode bias can be dead weight when the task's
+    feedback absorbs it.
+  - Argmax over epochs selects on noise; plateau averaging (SWA/EMA) and held-out selection beat it.
 
 ## 9. Memory and partial observability
 
@@ -185,14 +180,12 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   AAAI fall symp.), **R2D2** (stored hidden state + burn-in beats zero-init), **Ni, Eysenbach,
   Salakhutdinov 2022 ICML** ("Recurrent model-free RL can be a strong baseline for many POMDPs":
   separate actor and critic RNNs, long context, careful tuning beats specialised methods).
-- **BPTT truncation** and **teacher forcing** matter: aquila trains the GRU student on sequences of
-  500 steps with hidden state restarted at episode boundaries, batch 64, one cuDNN call per
-  reset-free interval. Memory is what performs implicit system identification (RMA, RAPTOR): the
+- **BPTT truncation** and **teacher forcing** matter: train on long sequences with the hidden state
+  restarted at episode boundaries, and check how a boundary inside a chunk is handled. Memory is what performs implicit system identification (RMA, RAPTOR): the
   domain-randomised parameter must stay *constant within an episode* for the memory to identify it
   (DR timescale rule, §10).
 - Pitfalls: feeding the policy its own previous action makes a delayed observation of it part of the
-  state (aquila §6.1: delaying "all 22 dims" overstated the latency problem because it also delayed
-  the previous action); a Markov critic on a POMDP is a biased bootstrap target (use a recurrent or
+  state (delaying the whole observation, previous action included, overstates a latency problem); a Markov critic on a POMDP is a biased bootstrap target (use a recurrent or
   privileged critic).
 
 ## 10. Sim-to-real and robot learning
@@ -204,21 +197,20 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   (sim-to-multi-real), Kaufmann et al. 2023 Nature (Swift, champion-level racing), Song et al. 2023
   Science Robotics (RL vs optimal control: RL wins by optimising the true objective, not a proxy),
   RAPTOR (above).
-- **DR timescale rule** (aquila EVIDENCE §2): per-step for fast exogenous noise (sensor/action noise,
+- **DR timescale rule**: per-step for fast exogenous noise (sensor/action noise,
   gusts), per-episode-constant for structural parameters the memory must identify (mass, motor time
   constant, drag, bias, rotor fault). Per-step structural jitter destroys the sysID signal.
-- **Latency is the usual sim-only killer**: a memoryless high-gain inner loop has no phase margin. In
-  aquila one 10 ms IMU frame of delay on attitude + gyro cost ~25 % of episodes even from rest;
-  position/velocity channels tolerated 30 ms; a heavy velocity low-pass filter (IIR 0.9 at 100 Hz) is
-  a delay in disguise and halved survival; a 400 Hz re-evaluation executor bought 5 ms for free.
-  Train with the delay (aquila's attitude-delay lever, kept) and measure the real gyro → motor budget
+- **Latency is the usual sim-only killer**: a memoryless high-gain inner loop has no phase margin. One
+  control frame of delay on attitude and gyro can cost a large share of episodes while position and
+  velocity channels tolerate several; a heavy low-pass filter is a delay in disguise; a faster
+  re-evaluation executor buys back part of a frame. Train with the delay you will have and measure the real gyro → motor budget
   before flight.
-- **Taxonomy of levers** (aquila §2): P0 = distill-time only, valid inside the teachers' competence
+- **Taxonomy of levers** (teacher–student pipelines): P0 = distill-time only, valid inside the teachers' competence
   envelope (measure that first with a competence sweep); P1/P2 = transition-function changes that need
   a teacher retrain, batched into one campaign. Keep the faithful path byte-identical with the lever
   off (guard the term, never multiply by zero) so every lever has a clean A/B.
-- Where DR does not pay: drag for a low-speed hover mission (the return gate was blind to it and the
-  drag-trained student overshot more).
+- Where DR does not pay: a parameter the task metric is blind to (drag on a low-speed hover mission)
+  cannot be tuned and can cost elsewhere.
 
 ## 11. Evaluation methodology
 
@@ -231,12 +223,11 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   **Jordan et al. 2020 ICML**, **Patterson et al. 2024 JMLR** ("Empirical design in RL"): the
   checklist for an honest comparison.
 - **Selection bias**: the expected maximum of N normal draws is +0.56σ (N=2), +1.16σ (N=5), +1.54σ
-  (N=10), +2.07σ (N=32) above the mean (`compare_arms.py max-of-n`). aquila's "final vs best-of-10
-  checkpoint" gap of +34.8 at eval sd ≈ 24 was almost exactly this (+37 expected): the real signal
-  was the sub-300 tail, not the mean. Select on one held-out set, report on another (aquila's
-  t2i-stratified split), and compare picks only against picks made the same way.
+  (N=10), +2.07σ (N=32) above the mean (`compare_arms.py max-of-n`). A "final vs best-of-N
+  checkpoint" gap close to that figure is selection, not signal; look at the tail instead. Select on one
+  held-out set, report on another (stratified), and compare picks only against picks made the same way.
 - **One variable per run**; an A-vs-A′ pair (same arm, new seed) gives the noise floor a lever must
-  clear; pre-register the gate and the kill rule before the run (aquila's PLAN items, prereg files and A4 gates);
+  clear; pre-register the gate and the kill rule before the run (a plan item or a prereg file the record cites);
   a confounded run gets a Confounded line and the verdict judges the bundle (SKILL.md Rules).
 - **Metric**: a task metric independent of the shaped reward (success rate, tracking error, frames
   below a fixed gate), never the training return when reward weights differ between arms.
@@ -247,8 +238,8 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   shaping that preserves the optimal policy; anything else can change what is optimal. S&B 3.2/17.4.
 - **Specification gaming / reward hacking** (Amodei et al. 2016 arXiv; Skalse et al. 2022 NeurIPS
   formal definition): the agent optimises the reward you wrote, not the one you meant. Action-rate and
-  energy penalties are the usual regularisers in control and carry their own tax (aquila: ≈ 35 of a
-  −60 return gap was the d_action term charging an inherited busy style).
+  energy penalties are the usual regularisers in control and carry their own tax (an action-rate
+  term can account for most of a return gap by charging an inherited busy style).
 - Practical rules: sparse task term + a few dense terms with physical units; log each term's
   contribution (Isaac Lab multiplies term × weight before logging, so never compare Episode_Reward
   across weight changes); curriculum the *difficulty*, not the reward; normalise returns rather than
@@ -265,17 +256,17 @@ Contents: 1 Value-based · 2 On-policy policy gradient · 3 Off-policy actor–c
   a reason policy-gradient updates are smoother (S&B 13.1).
 - **Entropy collapse** (SAC α → 0, PPO entropy → 0): exploration ends; fix the target entropy or
   entropy coefficient, check reward scale.
-- **Late collapse** of an otherwise converged run (aquila §6.5: 69/1000 SAC teachers finished > 100
-  below their best): keep snapshots, re-evaluate the top ones on fresh seeds before trusting
+- **Late collapse** of an otherwise converged run (a few percent of a converged SAC population
+  can finish well below its best): keep snapshots, re-evaluate the top ones on fresh seeds before trusting
   "keep best" (the gain is mostly selection bias otherwise).
 - **Value-function lag after a change** (reward, observation or curriculum stage): the critic's
   targets move; expect a dip; re-warm.
 - **Time limits treated as terminals** (Pardo et al. 2018 ICML): bootstrapping must continue through a
   truncation and stop only at a true terminal; conflating `done` with `terminated` biases every value.
-- **Action chatter** under sensor noise when noise was not in training (aquila: action rate
-  0.007 → 0.70 without noise training vs 0.039 with).
+- **Action chatter** under sensor noise when noise was not in training (the action rate
+  jumps by an order of magnitude or more).
 - **Non-finite states** in a vectorised sim poisoning masked statistics (NaN·0 = NaN): use `where`,
-  not multiplication, for masking (aquila's offset estimator bug).
+  not multiplication, for masking.
 - **Numerics that change results**: TF32 defaults in cuDNN/cuBLAS, Adam ε placement (rl-tools floors
   the second moment at 1e-7 inside the sqrt: small-gradient steps are much smaller than torch Adam's),
   GEMM grouping differences at the ulp level that break bit-reproducibility across code versions.

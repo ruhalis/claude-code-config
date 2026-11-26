@@ -325,11 +325,11 @@ strict about this and it pays off when reading importance-sampling and policy-gr
 
 | book | the modern instance | note |
 |---|---|---|
-| 2.4 incremental update, 2.5 constant α | every SGD/Adam step on a TD target | deep RL always tracks; Adam's second-moment estimate adds its own recency (rl-tools' Adam floors it, see `aquila-map.md`) |
+| 2.4 incremental update, 2.5 constant α | every SGD/Adam step on a TD target | deep RL always tracks; Adam's second-moment estimate adds its own recency (rl-tools' Adam floors it inside the sqrt) |
 | 2.7 UCB | UCT in MCTS (8.11, AlphaZero), count bonuses | |
 | 2.8 gradient bandit with baseline | REINFORCE baseline, advantage | |
 | 3.2 reward hypothesis / what-not-how | reward hacking, potential-based shaping (Ng 1999) | |
-| 3.3 γ as horizon | γ = 0.99 ≈ 100 steps; aquila SAC γ (`config.py`) | |
+| 3.3 γ as horizon | γ = 0.99 ≈ 100 steps (1 s at 100 Hz) | |
 | 4.6 GPI | actor–critic, DAgger (evaluate the student's own states, improve toward teacher labels) | |
 | 5.5 importance sampling | PPO ratio, V-trace/Retrace truncated ratios, off-policy evaluation | variance grows with horizon |
 | 6.1 TD(0) | the critic loss in DDPG/TD3/SAC, DQN | |
@@ -347,5 +347,5 @@ strict about this and it pays off when reading importance-sampling and policy-gr
 | 13.2 PG theorem | REINFORCE, A2C, PPO, DPG (deterministic variant), soft PG (SAC) | |
 | 13.4 baseline | value baseline, advantage normalisation | |
 | 13.7 Gaussian policy | PPO/SAC heads; tanh squashing is post-book (SAC appendix) | |
-| 17.3 state from observations | GRU/LSTM policies (R2D2, aquila's student), asymmetric critics | |
-| 17.4 reward design | Isaac Lab reward terms × weights; aquila's d_action term tax | |
+| 17.3 state from observations | GRU/LSTM policies (R2D2, RAPTOR's student), asymmetric critics | |
+| 17.4 reward design | Isaac Lab reward terms × weights; an action-rate term's tax | |

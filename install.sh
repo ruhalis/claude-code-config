@@ -8,13 +8,15 @@ set -euo pipefail
 #   ./install.sh claude             install into one tool
 #   ./install.sh claude vscode      install into several
 #   ./install.sh vscode             merge the VS Code settings, install missing extensions
-#   ./install.sh skills             link only the skills
+#   ./install.sh skills             link only the skills (global and per-project)
 #   ./install.sh all                install into all tools, detected or not
 #   ./install.sh --dry-run all      print the plan, change nothing
 #
 # Layout:
-#   core/          source of truth: agents and skills
-#   adapters/claude/  CLAUDE.md + settings.json + keybindings.json (both merged) + hooks/ + bin/clangd
+#   core/          source of truth: agents, skills (linked into ~/.claude/skills) and
+#                  optional-skills (linked into the projects named in its projects.txt)
+#   adapters/claude/  CLAUDE.md + output-styles/ + statusline.sh + settings.json and
+#                  keybindings.json (both merged) + hooks/ + mods/ + bin/clangd
 #   adapters/vscode/  extensions.txt + settings.json (merged)
 #   scripts/       skill lint, bench, cleanup
 
@@ -91,8 +93,9 @@ copy() {  # copy <src> <dst>
 # Settings: repo wins recursively (arrays are replaced); live-only keys survive;
 # the four keys Claude Code writes itself keep their live value when live has them.
 # Retired keys are deleted last: the merge alone would keep a key the repo no
-# longer declares. subagentStatusLine is deprecated in favour of mods (agent-rows).
-JQ_SETTINGS='((.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))) | del(.subagentStatusLine)'
+# longer declares. subagentStatusLine is deprecated in favour of mods (agent-rows);
+# the plugins and marketplaces listed were removed from the setup on 2026-11-27.
+JQ_SETTINGS='((.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))) | del(.subagentStatusLine, .enabledPlugins["kicad-happy@kicad-happy"], .enabledPlugins["desktop-commander@claude-plugins-official"], .enabledPlugins["rea@rea"], .extraKnownMarketplaces["kicad-happy"], .extraKnownMarketplaces["rea"])'
 # Keybindings: per context, live blocks then repo blocks, repo winning per key.
 JQ_KEYBINDINGS='(.[0] * .[1]) + {bindings: ((((.[0].bindings // []) + (.[1].bindings // [])) | group_by(.context)) | map({context: .[0].context, bindings: (map(.bindings) | add)}))}'
 # VS Code settings: repo wins on the keys it declares; every live-only key survives.
@@ -229,11 +232,39 @@ report_skills() {
     [ "$clean" = 0 ] || note "every core skill is linked from $*"
 }
 
+# Optional skills live in core/optional-skills and are linked only into the
+# projects that use them: <project>/.claude/skills/<name>. projects.txt maps
+# each skill to its project directories; one missing on this machine is skipped.
+# The link holds an absolute path of this machine, so it is listed in the
+# project's .git/info/exclude instead of being committed there.
+link_optional_skills() {
+    local map="$REPO_DIR/core/optional-skills/projects.txt" name dirs p src excl
+    [ -f "$map" ] || return 0
+    step "Optional skills -> projects"
+    while read -r name dirs; do
+        case "$name" in ''|'#'*) continue ;; esac
+        src="$REPO_DIR/core/optional-skills/$name"
+        [ -d "$src" ] || { warn "projects.txt names $name, which is not in core/optional-skills"; continue; }
+        for p in $dirs; do
+            p="${p/#\~/$HOME}"
+            [ -d "$p" ] || { note "$name: $p is not on this machine; skipped"; continue; }
+            backup "$p/.claude/skills/$name" "projects/$(basename "$p")"
+            link "$src" "$p/.claude/skills/$name"
+            excl=$(git -C "$p" rev-parse --git-path info/exclude 2>/dev/null) || continue
+            case "$excl" in /*) ;; *) excl="$p/$excl" ;; esac
+            grep -Fxq ".claude/skills/$name" "$excl" 2>/dev/null && continue
+            say "exclude .claude/skills/$name in $excl"
+            [ "$DRY_RUN" = 1 ] || { mkdir -p "$(dirname "$excl")"; printf '%s\n' ".claude/skills/$name" >> "$excl"; }
+        done
+    done < "$map"
+}
+
 install_skills() {
     local c="$HOME/.claude/skills"
     step "Skills -> $c"
     skills_claude "$c"
     report_skills "$c"
+    link_optional_skills
 }
 
 # Lint core/skills. It only reports:
@@ -262,10 +293,24 @@ install_claude() {
     step "Claude Code -> $dir"
     mk "$dir"
 
-    # statusline (submodule; Claude-only feature)
+    # status line: this repo's own script. It reads only the JSON Claude Code
+    # pipes to it. The first line clears the link to the third-party submodule it
+    # replaced on 2026-11-27 (that one read the login token to fetch usage).
     backup "$dir/statusline" claude
-    link "$REPO_DIR/statusline" "$dir/statusline"
-    [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/statusline/statusline.sh"
+    backup "$dir/statusline.sh" claude
+    link "$REPO_DIR/adapters/claude/statusline.sh" "$dir/statusline.sh"
+    [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/statusline.sh"
+
+    # output styles: orchestrator.md carries the main-session rules (subagents
+    # never receive an output style); settings.json selects it with outputStyle.
+    # Not swept: the folder may hold styles of the user's own.
+    mk "$dir/output-styles"
+    local o
+    for o in "$REPO_DIR"/adapters/claude/output-styles/*.md; do
+        [ -e "$o" ] || continue
+        backup "$dir/output-styles/${o##*/}" claude
+        link "$o" "$dir/output-styles/${o##*/}"
+    done
 
     # mods (hooks modules), loaded through CLAUDE_CODE_PLUGIN_DIRS in
     # settings.json's env, which names each link below. agent-rows draws the
@@ -281,16 +326,29 @@ install_claude() {
         link "$m" "$dir/mods/${m##*/}"
     done
 
-    # hooks, wired in settings.json: the main-session guard (PreToolUse on Bash),
-    # the KiCad guard (PreToolUse on Edit, Write and Bash; Fable-only writes)
+    # hooks, wired in settings.json: the main-session guard (PreToolUse on Bash)
     # and the git-write guard (PreToolUse on Bash; no commit, push, merge ... for anyone)
     mk "$dir/hooks"
     local h
-    for h in guard-main-session.sh guard-kicad-edit.sh guard-git-write.sh; do
+    for h in guard-main-session.sh guard-git-write.sh; do
         backup "$dir/hooks/$h" claude
         link "$REPO_DIR/adapters/claude/hooks/$h" "$dir/hooks/$h"
         [ "$DRY_RUN" = 1 ] || chmod +x "$REPO_DIR/adapters/claude/hooks/$h"
     done
+    # The KiCad guard was removed on 2026-11-27. A session started before the
+    # settings merge below still calls its path on every Edit, Write and Bash with
+    # onFailure: block, and a missing script would block them all. So a link left
+    # from the old install becomes a no-op file; delete it by hand once every
+    # session has been restarted.
+    h="$dir/hooks/guard-kicad-edit.sh"
+    if [ -L "$h" ]; then
+        say "retire $h (no-op until sessions restart)"
+        [ "$DRY_RUN" = 1 ] || {
+            printf '#!/bin/sh\n# Retired 2026-11-27 with the KiCad guard; safe to delete once every session has restarted.\nexit 0\n' > "$h.new"
+            chmod +x "$h.new"
+            mv -f "$h.new" "$h"
+        }
+    fi
 
     # clangd wrapper. The clangd-lsp plugin starts the first `clangd` on PATH with
     # a fixed command line, so this one has to come before the system clangd:
@@ -327,6 +385,7 @@ install_claude() {
 
     # skills — swept, except Claude Code's own synced/ and .trash/
     skills_claude "$dir/skills"
+    link_optional_skills
 
     # settings and keybindings are merged copies: Claude rewrites settings.json
     # in place (theme, model, effort, plugins), and a symlink would push that
@@ -469,7 +528,7 @@ esac
 printf '%sInstalling from %s%s\n' "$B" "$REPO_DIR" "$RST"
 [ "$DRY_RUN" = 1 ] && printf '%s(dry run — nothing will be written)%s\n' "$YEL" "$RST"
 
-# The submodules are the Claude statusline and the upstream anatomy skill.
+# The one submodule is the upstream anatomy skill.
 case " ${TOOLS[*]} " in
     *" claude "*)
         if [ -f "$REPO_DIR/.gitmodules" ] && [ "$DRY_RUN" = 0 ]; then

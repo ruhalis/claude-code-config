@@ -1,0 +1,6 @@
+# Optional skills and the project directories they are linked into by install.sh,
+# as <project>/.claude/skills/<skill>. One line per skill: its name, then the
+# directories. A directory missing on this machine is skipped.
+isaac          ~/projects/aquila ~/projects/berkley
+led-animation  ~/projects/renee
+motor-bench    ~/projects/aquila

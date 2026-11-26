@@ -1,23 +1,23 @@
 ---
 name: shopping
-description: "Personal shopper for Arlan in Kazakhstan: finds, checks and compares anything to buy - FPV/RC and robotics parts, electronics, tools, consumables, general goods - across Kazakh stores (Kaspi, Satu, Technodom, Wildberries, Ozon, OLX), China marketplaces (AliExpress, Banggood, Temu) and foreign specialist stores, and returns a shortlist plus a private Artifact comparison page with landed cost in tenge (price, shipping, customs estimate), stock, delivery, spec check and risks. Read-only: never logs in, adds to cart or buys. Use whenever the user says buy, where to buy, find me, cheapest, compare prices, is X available in Kazakhstan, parts hunting, купить, где купить, сколько стоит, or names a store or a part to source (ESC, motor, LiPo, frame, sensor, dev board, tool). For components with a manufacturer part number it also uses the kicad-happy lcsc/digikey/mouser/element14 skills; not for a PCB BOM or JLCPCB order (kicad-happy bom/jlcpcb)."
+description: "Read-only personal shopper for a buyer in Kazakhstan: finds, checks and compares anything to buy (FPV/RC and robotics parts, electronics, tools, consumables, general goods) across Kazakh stores, China marketplaces and foreign specialist stores, and returns a shortlist plus a private Artifact comparison page with landed cost in tenge, stock, delivery, spec check and risks. Never logs in, adds to cart or buys. Use for buy, where to buy, find me, cheapest, compare prices, is X available in Kazakhstan, купить, где купить, сколько стоит, or a store or part to source."
 ---
 
 # Shopping
 
-Arlan lives in Kazakhstan. Find what Arlan wants to buy, check it against what the job needs, and compare the real options delivered to Kazakhstan: a short answer in the terminal and a private Artifact comparison page to reopen later. Arlan buys from the links; this skill never does.
+The user lives in Kazakhstan. Find what they want to buy, check it against what the job needs, and compare the real options delivered to Kazakhstan: a short answer in the terminal and a private Artifact comparison page to reopen later. The user buys from the links; this skill never does.
 
 ## Hard limits
 
 - **Read-only.** Never log in, create an account, open a cart, checkout, account or order page, add to cart, enter an address or payment details, message a seller, post a review, or click anything that changes state on a store.
-- **The browser is Arlan's own logged-in Chrome.** Read product and search pages only. Never copy or record names, addresses, phone numbers, order history or anything else personal that a page shows. Only one agent drives the browser at a time.
+- **The browser is the user's own logged-in Chrome.** Read product and search pages only. Never copy or record names, addresses, phone numbers, order history or anything else personal that a page shows. Only one agent drives the browser at a time.
 - **No getting around sellers or export rules.** If a seller doesn't ship to Kazakhstan, or restricts the item (flight controllers, ESCs, radios and other dual-use electronics can be), say so and drop or flag that option; a refusal is final. A parcel forwarder is only for ordinary goods that a store simply doesn't ship to Kazakhstan, and never for a seller whose terms forbid reshipping (Holybro's do). Never suggest misdeclaring value, contents or destination, or splitting an order to stay under the duty-free limit; compute duty honestly.
 - **Low volume.** A few requests per store, at least 5 s apart per host (the script enforces it), back off on HTTP 429. Each store is read by exactly one agent per search.
 - **Prices are snapshots.** Every price carries the time it was checked and its source link.
 
 ## Profile
 
-`~/.claude/shopping/profile.md` holds: city (Kaspi and Technodom prices and stock depend on it), Kaspi city id, stores Arlan likes or avoids, dated store notes ("GetFPV: Cloudflare, browser only, 2026-11-06"; "<store> refused KZ for <item>, <date>"), and outcomes of past purchases (where, price paid, what arrived, how long it took). Never addresses, cards, phone numbers or account names.
+`~/.claude/shopping/profile.md` holds: city (Kaspi and Technodom prices and stock depend on it), Kaspi city id, stores the user likes or avoids, dated store notes ("GetFPV: Cloudflare, browser only, 2026-11-06"; "<store> refused KZ for <item>, <date>"), and outcomes of past purchases (where, price paid, what arrived, how long it took). Never addresses, cards, phone numbers or account names.
 
 Read it first. If there is no city yet, ask once and save it. Kaspi city ids look like KATO codes (Almaty 750000000, Astana 710000000); confirm the id on first use from a Kaspi offers response before saving it. Update the profile at the end of every search.
 
@@ -25,9 +25,9 @@ Read it first. If there is no city yet, ask once and save it. Kaspi city ids loo
 
 ### 1. Pin down the need
 
-What, how many, budget in KZT, deadline, must-haves. For a project part, read the project CLAUDE.md `## Hardware`, `## Boards` and `## Motors` sections and turn them into hard specs (for an ESC: cell count, continuous and burst current, mounting pattern, protocol, firmware, weight, connectors). Ask one `AskUserQuestion` round only if a missing spec would change the answer.
+What, how many, budget in KZT, deadline, must-haves. For a project part, read the project's own spec docs (its CLAUDE.md and any hardware or parts notes) and turn them into hard specs (for an ESC: cell count, continuous and burst current, mounting pattern, protocol, firmware, weight, connectors). Ask one `AskUserQuestion` round only if a missing spec would change the answer.
 
-Parts with a manufacturer part number (ICs, passives, connectors, modules with an MPN): load the kicad-happy `lcsc`, `digikey`, `mouser` or `element14` skill for those distributors, and still check the Kazakh stores.
+Parts with a manufacturer part number (ICs, passives, connectors, modules with an MPN): search the distributors that list stock and price by part number (LCSC, DigiKey, Mouser, element14), and still check the Kazakh stores.
 
 ### 2. Choose sources, local first
 
@@ -56,11 +56,11 @@ Item + shipping + customs estimate for foreign parcels (current rules and their 
 ### 6. Present
 
 - **Terminal:** the top 2-3 options, one line each on why, and the page link.
-- **Page** (see Comparison page). Then stop; narrow further only if Arlan asks.
+- **Page** (see Comparison page). Then stop; narrow further only if the user asks.
 
 ### 7. Record
 
-Update the profile's store notes (what worked, what blocked, who refused Kazakhstan). When Arlan later says what was bought and how it went, add it to the outcomes.
+Update the profile's store notes (what worked, what blocked, who refused Kazakhstan). When the user later says what was bought and how it went, add it to the outcomes.
 
 ## Script
 
@@ -96,4 +96,4 @@ Report as a JSON array of rows plus those two lists, under 500 words. No recomme
 
 ## Language
 
-Answer in the language Arlan asks in (Russian or English); keep product names as the store lists them.
+Answer in the language the user asks in (Russian or English); keep product names as the store lists them.
