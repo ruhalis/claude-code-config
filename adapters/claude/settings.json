@@ -8,23 +8,21 @@
   "enableWorkflows": true,
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline/statusline.sh"
+    "command": "~/.claude/statusline.sh"
   },
+  "outputStyle": "orchestrator",
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "cloudflare@cloudflare": true,
     "data@knowledge-work-plugins": true,
     "design@knowledge-work-plugins": true,
-    "desktop-commander@claude-plugins-official": true,
     "document-skills@anthropic-agent-skills": true,
     "engineering@knowledge-work-plugins": true,
     "frontend-design@claude-plugins-official": true,
-    "kicad-happy@kicad-happy": true,
     "nvidia-skills@claude-plugins-official": true,
     "pdf-viewer@knowledge-work-plugins": true,
     "pyright-lsp@claude-plugins-official": true,
-    "rea@rea": true,
     "session-report@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "text-to-cad@earthtojake": true
@@ -36,13 +34,6 @@
         "repo": "earthtojake/text-to-cad",
         "ref": "latest"
       }
-    },
-    "kicad-happy": {
-      "source": {
-        "source": "github",
-        "repo": "aklofas/kicad-happy"
-      },
-      "autoUpdate": true
     },
     "knowledge-work-plugins": {
       "source": {
@@ -63,13 +54,6 @@
         "source": "github",
         "repo": "cloudflare/skills",
         "ref": "cbf893b954222276bf1af57e5f23379231e0efb9"
-      }
-    },
-    "rea": {
-      "source": {
-        "source": "github",
-        "repo": "morluto/rea",
-        "ref": "5d1a47768aa0ff43077758db57f9e99e9f3034a9"
       }
     }
   },
@@ -147,12 +131,6 @@
       "Bash(git *push* --force*)",
       "Bash(git *push* -f*)",
       "Bash(git *push* +*)",
-      "mcp__plugin_desktop-commander_desktop-commander__start_process",
-      "mcp__plugin_desktop-commander_desktop-commander__interact_with_process",
-      "mcp__plugin_desktop-commander_desktop-commander__write_file",
-      "mcp__plugin_desktop-commander_desktop-commander__write_pdf",
-      "mcp__plugin_desktop-commander_desktop-commander__edit_block",
-      "mcp__plugin_desktop-commander_desktop-commander__move_file",
       "Bash(git reset --hard *)",
       "Bash(git clean -fd *)",
       "Bash(git clean -fdx *)",
@@ -160,14 +138,11 @@
       "Bash(rm -rf / *)",
       "Bash(rm -rf ~)",
       "Bash(rm -rf /)",
+      "Agent(Explore)",
       "Skill(text-to-cad:pcb)",
       "Skill(text-to-cad:pcb *)",
       "Skill(text-to-cad:sendcutsend)",
       "Skill(text-to-cad:sendcutsend *)",
-      "Skill(kicad-happy:kicad)",
-      "Skill(kicad-happy:kicad *)",
-      "Skill(kicad-happy:pcbway)",
-      "Skill(kicad-happy:pcbway *)",
       "Skill(cloudflare:basin)",
       "Skill(cloudflare:basin *)",
       "Skill(cloudflare:k2)",
@@ -184,12 +159,7 @@
       "Skill(cloudflare:sandbox-migrate-to-next *)"
     ],
     "ask": [
-      "mcp__plugin_rea_rea__*",
-      "mcp__plugin_cloudflare_cloudflare__execute",
-      "mcp__plugin_desktop-commander_desktop-commander__create_directory",
-      "mcp__plugin_desktop-commander_desktop-commander__set_config_value",
-      "mcp__plugin_desktop-commander_desktop-commander__kill_process",
-      "mcp__plugin_desktop-commander_desktop-commander__force_terminate"
+      "mcp__plugin_cloudflare_cloudflare__execute"
     ]
   },
   "hooks": {
@@ -211,17 +181,6 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/guard-git-write.sh",
-            "timeout": 10,
-            "onFailure": "block"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/guard-kicad-edit.sh",
             "timeout": 10,
             "onFailure": "block"
           }

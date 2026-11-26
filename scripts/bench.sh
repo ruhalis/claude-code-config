@@ -1,37 +1,40 @@
 #!/usr/bin/env bash
 # Bench test for the installed Claude Code setup: does it behave the way
-# adapters/claude/CLAUDE.md and README.md claim?
+# adapters/claude/CLAUDE.md, the orchestrator output style and README.md claim?
 #
 #   scripts/bench.sh            static checks only (no API calls, a few seconds)
 #   scripts/bench.sh --live     also run headless `claude -p` sessions (API cost,
 #                               several minutes; needs `claude` logged in)
 #   scripts/bench.sh --live --only L2,L5   run a subset of the live cases
 #   scripts/bench.sh --keep     keep the live scratch dir for inspection
-#   BENCH_GUARD=<file> BENCH_KGUARD=<file> BENCH_GITGUARD=<file> scripts/bench.sh
+#   BENCH_GUARD=<file> BENCH_GITGUARD=<file> scripts/bench.sh
 #                               run the synthetic hook cases against candidate
-#                               copies of the three guard hooks. The live hooks are
+#                               copies of the two guard hooks. The live hooks are
 #                               symlinks into this repo, so an edit in place is
 #                               live at once and a broken one blocks every call:
 #                               test a copy this way first, then copy it over.
 #
-# Static (S*): symlinks point into this repo, live settings carry the hook, the
-# deny list, the cache TTL and the subagent env; agent frontmatter pins the
-# models and effort the docs say are valid; the guard hook decides correctly on
-# synthetic input; skills pass check-skills.sh; CLAUDE.md stays under the
-# documented 200-line budget.
+# Static: symlinks point into this repo (optional skills into the projects
+# projects.txt names), live settings carry the hooks, the output style, the deny
+# list, the cache TTL and the subagent env and none of the removed plugins; every
+# hook command exists; the status line is local-only; agent frontmatter pins the
+# models and effort the docs say are valid and no agent may call the advisor; the
+# guard hooks decide correctly on synthetic input; skills pass check-skills.sh;
+# CLAUDE.md and the output style still carry the rules the setup depends on.
 #
 # Live (L*), each a fresh `claude -p` run in a throwaway git repo whose project
 # CLAUDE.md holds a random sentinel word:
-#   L1  user CLAUDE.md reaches the main session (it can name the guard hook)
+#   L1  user CLAUDE.md reaches the main session (it names the settings key never to set)
 #   L2  project CLAUDE.md reaches the main session (it knows the sentinel)
 #   L3  a general-purpose subagent also gets CLAUDE.md (knows the sentinel)
-#   L4  the built-in Explore skips CLAUDE.md (does not know the sentinel)
+#   L4  the built-in Explore is denied: asked to use it, no Explore subagent starts
 #   L5  the guard hook denies `pytest` in the main session (marker file absent)
 #   L6  the same command passes inside a subagent (marker file present)
 #   L7  permissions.deny holds under bypassPermissions (`git clean -fd` blocked)
 #   L8  model routing, from modelUsage of a haiku main session:
 #       general-purpose + fast-executor -> a sonnet model, deep-reasoner -> opus
-#   L9  Explore -> a haiku model, from a sonnet main session
+#   L9  the orchestrator output style reaches the main session (it names the
+#       connector launcher and the agent that runs tests)
 # A logging hook (PreToolUse + SubagentStart) records every call with agent_id
 # and agent_type into hook-input.log so each verdict has evidence.
 #
@@ -46,7 +49,7 @@ while [ $# -gt 0 ]; do
         --live) LIVE=1 ;;
         --keep) KEEP=1 ;;
         --only) ONLY="$2"; shift ;;
-        -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,42p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
     shift
@@ -74,21 +77,63 @@ check "claude CLI installed" command -v claude
 
 echo "-- symlinks from install.sh"
 check "~/.claude/CLAUDE.md -> adapters/claude/CLAUDE.md" linked_to "$CLAUDE_DIR/CLAUDE.md" "$REPO_DIR/adapters/claude/CLAUDE.md"
-for a in Explore deep-reasoner fast-executor implementer verifier; do
+for a in deep-reasoner fast-executor implementer verifier; do
     check "~/.claude/agents/$a.md -> core/agents" linked_to "$CLAUDE_DIR/agents/$a.md" "$REPO_DIR/core/agents/$a.md"
 done
 for d in "$REPO_DIR"/core/skills/*/; do
     n=$(basename "$d")
     check "~/.claude/skills/$n -> core/skills" linked_to "$CLAUDE_DIR/skills/$n" "${d%/}"
 done
+# optional skills: linked into the projects projects.txt names, never globally
+MAP="$REPO_DIR/core/optional-skills/projects.txt"
+check "core/optional-skills/projects.txt exists" test -f "$MAP"
+mapped=" "
+while read -r name dirs; do
+    case "$name" in ''|'#'*) continue ;; esac
+    mapped+="$name "
+    check "projects.txt: $name is in core/optional-skills" test -d "$REPO_DIR/core/optional-skills/$name"
+    for p in $dirs; do
+        p="${p/#\~/$HOME}"
+        if [ ! -d "$p" ]; then skip "$name -> $p" "project not on this machine"; continue; fi
+        check "$p/.claude/skills/$name -> core/optional-skills" linked_to "$p/.claude/skills/$name" "$REPO_DIR/core/optional-skills/$name"
+        excl=$(git -C "$p" rev-parse --git-path info/exclude 2>/dev/null) || continue
+        case "$excl" in /*) ;; *) excl="$p/$excl" ;; esac
+        check "$p: .claude/skills/$name is in .git/info/exclude" grep -Fxq ".claude/skills/$name" "$excl"
+    done
+done < <([ -f "$MAP" ] && cat "$MAP")
+for d in "$REPO_DIR"/core/optional-skills/*/; do
+    [ -d "$d" ] || continue
+    n=$(basename "$d")
+    check "optional skill $n is named in projects.txt" bash -c "case '$mapped' in *' $n '*) exit 0;; esac; exit 1"
+    check "optional skill $n is not linked globally" bash -c "! [ -e '$CLAUDE_DIR/skills/$n' ] && ! [ -L '$CLAUDE_DIR/skills/$n' ]"
+done
 check "~/.claude/hooks/guard-main-session.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-main-session.sh" "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
-check "~/.claude/hooks/guard-kicad-edit.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
 check "~/.claude/hooks/guard-git-write.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-git-write.sh" "$REPO_DIR/adapters/claude/hooks/guard-git-write.sh"
 check "git-write guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-git-write.sh"
-check "KiCad guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
-check "KiCad guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh"
+# Retired 2026-11-27. Sessions started before the settings merge still call this
+# path with onFailure: block, so it may stay as a no-op file until they restart.
+OLDK="$CLAUDE_DIR/hooks/guard-kicad-edit.sh"
+if [ -e "$OLDK" ] || [ -L "$OLDK" ]; then
+    check "retired guard-kicad-edit.sh is a no-op (exit 0, no output; delete once every session restarted)" \
+        bash -c 'o=$(printf "{}" | "$1"); [ $? -eq 0 ] && [ -z "$o" ]' _ "$OLDK"
+else
+    ok "retired guard-kicad-edit.sh is gone"
+fi
+check "~/.claude/output-styles/orchestrator.md -> adapters/claude/output-styles" linked_to "$CLAUDE_DIR/output-styles/orchestrator.md" "$REPO_DIR/adapters/claude/output-styles/orchestrator.md"
+
+echo "-- status line"
+SL="$REPO_DIR/adapters/claude/statusline.sh"
+check "~/.claude/statusline.sh -> adapters/claude/statusline.sh" linked_to "$CLAUDE_DIR/statusline.sh" "$SL"
+check "status line is executable" test -x "$SL"
+check "status line passes bash -n" bash -n "$SL"
+one_line() { local o; o=$(printf '%s' "$1" | "$SL"); [ -n "$o" ] && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ]; }
+now=$(date +%s)
+SL_JSON=$(jq -nc --arg cwd "$REPO_DIR" --argjson t "$now" '{model:{display_name:"Opus"},effort:{level:"high"},cwd:$cwd,context_window:{used_percentage:42.7},rate_limits:{five_hour:{used_percentage:12,resets_at:($t+3600)},seven_day:{used_percentage:30.2,resets_at:($t+86400)}}}')
+check "status line prints one line for a full sample" one_line "$SL_JSON"
+check "status line prints one line for {}" one_line '{}'
+check "status line makes no network call and reads no credential (no curl, security, oauth)" bash -c "! grep -qiE 'curl|security |oauth' '$SL'"
 
 echo "-- settings"
 LIVE_S="$CLAUDE_DIR/settings.json"; REPO_S="$REPO_DIR/adapters/claude/settings.json"
@@ -100,20 +145,36 @@ for f in "$REPO_S" "$LIVE_S"; do
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-main-session.sh")) | select(.onFailure=="block")' "$f"
     check "$tag: PreToolUse hook on Bash runs guard-git-write.sh with onFailure block" \
         jq -e '.hooks.PreToolUse[]? | select(.matcher=="Bash") | .hooks[] | select(.command|test("guard-git-write.sh")) | select(.onFailure=="block")' "$f"
-    check "$tag: PreToolUse hook on Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].* runs guard-kicad-edit.sh with onFailure block" \
-        jq -e '.hooks.PreToolUse[]? | select(.matcher=="Edit|Write|Bash|mcp__.*[Kk][Ii][Cc][Aa][Dd].*") | .hooks[] | select(.command|test("guard-kicad-edit.sh")) | select(.onFailure=="block")' "$f"
+    check "$tag: no hook runs the removed guard-kicad-edit.sh" jq -e '[.. | .command? // empty | strings | select(test("guard-kicad-edit"))] | length == 0' "$f"
     check "$tag: permissions.deny covers commit, push, force push, reset --hard, clean -fd, rm -rf /" \
         jq -e '.permissions.deny as $d | ["Bash(git commit *)","Bash(git push *)","Bash(git push --force *)","Bash(git reset --hard *)","Bash(git clean -fd *)","Bash(rm -rf /)"] | all(. as $r | $d | index($r) != null)' "$f"
     check "$tag: permissions.deny covers merge, rebase, cherry-pick, revert, tag and the sweeping git add forms" \
         jq -e '.permissions.deny as $d | ["Bash(git merge *)","Bash(git rebase *)","Bash(git cherry-pick *)","Bash(git revert *)","Bash(git tag *)","Bash(git add -A *)","Bash(git add --all *)","Bash(git add -u *)","Bash(git add --update *)","Bash(git add .)","Bash(git add . *)"] | all(. as $r | $d | index($r) != null)' "$f"
-    check "$tag: permissions.ask covers the rea MCP tools" jq -e '(.permissions.ask // []) | index("mcp__plugin_rea_rea__*") != null' "$f"
-    check "$tag: the rea marketplace is pinned to a full commit SHA" jq -e '(.extraKnownMarketplaces.rea.source.ref // "") | test("^[0-9a-f]{40}$")' "$f"
+    check "$tag: permissions.deny keeps text-to-cad's pcb skill out" jq -e '.permissions.deny | index("Skill(text-to-cad:pcb)") != null' "$f"
+    check "$tag: permissions.deny removes the built-in Explore agent" jq -e '.permissions.deny | index("Agent(Explore)") != null' "$f"
+    check "$tag: no kicad-happy, desktop-commander or rea plugin or marketplace" \
+        jq -e '([(.enabledPlugins // {}) | keys[] | split("@")[0]] + ((.extraKnownMarketplaces // {}) | keys)) | any(IN("kicad-happy","desktop-commander","rea")) | not' "$f"
+    check "$tag: no permission rule for the removed plugins" \
+        jq -e '[(.permissions // {}) | .allow?, .ask?, .deny? | .[]? | select(test("desktop-commander|plugin_rea_|kicad-happy"))] | length == 0' "$f"
+    check "$tag: outputStyle is orchestrator" jq -e '.outputStyle=="orchestrator"' "$f"
+    check "$tag: statusLine runs ~/.claude/statusline.sh" jq -e '.statusLine.command=="~/.claude/statusline.sh"' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"
     check "$tag: env.CLAUDE_CODE_SUBAGENT_MODEL is sonnet" jq -e '.env.CLAUDE_CODE_SUBAGENT_MODEL=="sonnet"' "$f"
     check "$tag: CLAUDE_CODE_SUBAGENT_MODEL_FORCE is not set (it would override the pins)" \
         jq -e '(.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE // "") != "1"' "$f"
     check "$tag: advisorModel set" jq -e '.advisorModel != null' "$f"
 done
+# every hook command that is a path must exist: a missing script under onFailure: block stops every call
+hook_paths_exist() {
+    local c miss=""
+    while IFS= read -r c; do
+        c="${c%% *}"; c="${c/#\~/$HOME}"; c="${c/#\$HOME/$HOME}"
+        case "$c" in */*) [ -e "$c" ] || miss+=" $c" ;; esac
+    done < <(jq -r '.hooks // {} | .[][]?.hooks[]?.command // empty' "$1")
+    [ -z "$miss" ] || { echo "missing:$miss" >&2; return 1; }
+}
+check "live: every hook command path exists" hook_paths_exist "$LIVE_S"
+check "repo: every hook command path exists" hook_paths_exist "$REPO_S"
 if jq -e 'has("model") or has("autoMode")' "$LIVE_S" >/dev/null; then
     live_only=$(jq -r --slurpfile r "$REPO_S" 'keys - ($r[0]|keys) | join(" ")' "$LIVE_S")
     printf '  NOTE  live-only settings keys (re-merge after any install.sh run): %s\n' "${live_only:-none}"
@@ -121,9 +182,9 @@ fi
 
 echo "-- agent frontmatter"
 # bash 3.2 on macOS has no associative arrays
-wm() { case $1 in Explore) echo haiku;; deep-reasoner|implementer) echo opus;; *) echo sonnet;; esac; }
-we() { case $1 in Explore) echo low;; deep-reasoner) echo xhigh;; implementer) echo high;; *) echo medium;; esac; }
-for a in Explore deep-reasoner fast-executor implementer verifier; do
+wm() { case $1 in deep-reasoner|implementer) echo opus;; *) echo sonnet;; esac; }
+we() { case $1 in deep-reasoner) echo xhigh;; implementer) echo high;; *) echo medium;; esac; }
+for a in deep-reasoner fast-executor implementer verifier; do
     f="$REPO_DIR/core/agents/$a.md"
     check "$a: model is $(wm "$a")" test "$(fm "$f" model)" = "$(wm "$a")"
     check "$a: effort is $(we "$a")" test "$(fm "$f" effort)" = "$(we "$a")"
@@ -135,8 +196,12 @@ for a in fast-executor implementer verifier; do
 done
 check "deep-reasoner has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/deep-reasoner.md'"
 check "verifier has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/verifier.md'"
-check "Explore has omitClaudeMd: true (our override is a custom agent; without it CLAUDE.md loads)" test "$(fm "$REPO_DIR/core/agents/Explore.md" omitClaudeMd)" = true
-check "Explore has no Edit/Write (read-only)" bash -c "! grep -qE '^tools:.*\b(Edit|Write)\b' '$REPO_DIR/core/agents/Explore.md'"
+check "no Explore override in core/agents or ~/.claude/agents (Explore is denied in settings)" bash -c "[ ! -e '$REPO_DIR/core/agents/Explore.md' ] && [ ! -L '$CLAUDE_DIR/agents/Explore.md' ] && [ ! -e '$CLAUDE_DIR/agents/Explore.md' ]"
+for f in "$REPO_DIR"/core/agents/*.md; do
+    a=$(basename "$f" .md)
+    check "$a: says never call the advisor tool" grep -qi "never call the advisor tool" "$f"
+    check "$a: nothing permits the advisor" bash -c "! grep -qiE '(may|can|should) (consult|call|use) the advisor|advisor[^.]*(allowed|permitted)' '$f'"
+done
 
 echo "-- guard hook on synthetic input"
 GUARD="${BENCH_GUARD:-$REPO_DIR/adapters/claude/hooks/guard-main-session.sh}"
@@ -200,80 +265,6 @@ check "GUARD_MAIN_SESSION_OFF=1 works without jq" guard_off_nojq
 check "missing jq fails closed (exit 1 + message)" guard_nojq_fails
 check "deny reason names the verifier" reason_names_verifier
 check "pytest deny reason names verifier" reason_names_verifier
-
-echo "-- KiCad guard hook on synthetic input"
-KGUARD="${BENCH_KGUARD:-$REPO_DIR/adapters/claude/hooks/guard-kicad-edit.sh}"
-[ -z "${BENCH_KGUARD:-}" ] || printf '  NOTE  testing a candidate KiCad guard: %s\n' "$KGUARD"
-KT=$(mktemp -d)
-# A session transcript per model, plus subagent transcripts under <session>/subagents/.
-for m in fable-5-2 opus-5-5 sonnet-5-5; do
-    jq -nc '{type:"user",message:{role:"user"}}' > "$KT/${m%%-*}.jsonl"
-    jq -nc --arg m "claude-$m" '{type:"assistant",message:{model:$m}}' >> "$KT/${m%%-*}.jsonl"
-done
-jq -nc '{type:"user",message:{role:"user"}}' > "$KT/empty.jsonl"
-mkdir -p "$KT/opus/subagents" "$KT/fable/subagents"
-jq -nc '{type:"assistant",message:{model:"claude-fable-5-2"}}' > "$KT/opus/subagents/agent-fab1.jsonl"
-jq -nc '{type:"assistant",message:{model:"claude-sonnet-5-5"}}' > "$KT/fable/subagents/agent-son1.jsonl"
-jq -nc '{type:"user",message:{role:"user"}}' > "$KT/fable/subagents/agent-new1.jsonl"
-# k_json <session> <tool> <file_path or command> [agent_id]
-k_json() { jq -n --arg t "$KT/$1.jsonl" --arg tool "$2" --arg v "$3" --arg a "${4:-}" \
-    '{transcript_path:$t,tool_name:$tool,tool_input:(if $tool=="Bash" then {command:$v} else {file_path:$v} end)} + (if $a=="" then {} else {agent_id:$a} end)'; }
-k_deny() { k_json "$@" | "$KGUARD" | jq -e '.hookSpecificOutput.permissionDecision=="deny"' >/dev/null; }
-k_pass() { local o; o=$(k_json "$@" | "$KGUARD"); [ -z "$o" ]; }
-k_reason() { local w="$1"; shift; k_json "$@" | "$KGUARD" | jq -e --arg w "$w" '.hookSpecificOutput.permissionDecisionReason|test($w)' >/dev/null; }
-for p in board.kicad_pcb "/x/my board/a.kicad_sch" a.kicad_pro lib.kicad_sym fp.pretty/r.kicad_mod sheet.kicad_wks rules.kicad_dru Board.zen; do
-    check "opus Edit denied: $p" k_deny opus Edit "$p"
-    check "sonnet Write denied: $p" k_deny sonnet Write "$p"
-    check "fable Edit allowed: $p" k_pass fable Edit "$p"
-    check "fable Write allowed: $p" k_pass fable Write "$p"
-done
-for p in README.md notes.kicad_pcb.md pcb.toml review/drc.json a.kicad_prl zen.md src/main.c; do
-    check "opus Edit allowed: $p" k_pass opus Edit "$p"
-done
-check "opus Read of a board is not guarded" k_pass opus Read board.kicad_pcb
-for c in 'sed -i "" "s/a/b/" board.kicad_pcb' 'sed -E -i.bak s/a/b/ "my board.kicad_sch"' "perl -pi -e 's/a/b/' x.kicad_sch" 'echo x > Board.zen' \
-    $'cat >> a.kicad_sch <<EOF\n(x)\nEOF' 'printf x | tee a.kicad_pro' 'pcb layout --no-open Board.zen' 'cd b && pcb import x.kicad_pro .' \
-    'pcb apply schematic --no-open B.zen' 'pcb new board X https://example.com/x' 'pcb fmt' 'pcb fix B.zen' 'pcb migrate .' 'pcb route --engine freerouting B.zen' \
-    '~/.local/bin/pcb layout B.zen' 'KICAD_CLI=/x pcb layout B.zen' 'pcb +nightly layout B.zen' 'pcb build B.zen; pcb layout B.zen' \
-    'pcb-component-gen x' 'kicad-cli sch upgrade a.kicad_sch' '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli pcb upgrade b.kicad_pcb'; do
-    check "opus Bash denied: $c" k_deny opus Bash "$c"
-    check "fable Bash allowed: $c" k_pass fable Bash "$c"
-done
-for c in 'pcb build Board.zen' 'pcb layout --check Board.zen' 'pcb bom --offline Board.zen' 'pcb help layout' 'pcb help fix' 'pcb --version' 'pcb sim tb.zen' 'pcb dfm B.zen' \
-    'kicad-cli pcb drc --format json -o review/drc.json b.kicad_pcb' 'kicad-cli sch export netlist a.kicad_sch > review/a.net' \
-    'kicad-cli pcb export svg b.kicad_pcb >b.kicad_pcb.log 2>&1' 'grep -n "(net " b.kicad_pcb' 'sed -n "1,20p" a.kicad_sch' \
-    "perl -ne 'print if /net/' a.kicad_sch" 'cat Board.zen' 'git diff -- b.kicad_pcb' 'cp -R board board-copy' 'git status' 'ls eda/'; do
-    check "opus Bash allowed: $c" k_pass opus Bash "$c"
-done
-# kicad-happy's bom scripts rewrite symbol properties in the schematic unless --dry-run is given
-for c in 'python3 /p/skills/bom/scripts/edit_properties.py hardware/b/b.kicad_sch --updates u.json' \
-    'python3 "$CLAUDE_PLUGIN_ROOT/skills/bom/scripts/sync_datasheet_urls.py" hardware/b/b.kicad_sch --overwrite' \
-    'cd hw && uv run /p/edit_properties.py b.kicad_sch --updates u.json' 'cat u.json; python3 sync_datasheet_urls.py b.kicad_sch'; do
-    check "opus Bash denied: $c" k_deny opus Bash "$c"
-    check "fable Bash allowed: $c" k_pass fable Bash "$c"
-done
-check "that denial names the bom script" k_reason "bom script" opus Bash 'python3 /p/edit_properties.py b.kicad_sch --updates u.json'
-for c in 'python3 /p/skills/bom/scripts/edit_properties.py b.kicad_sch --updates u.json --dry-run' 'python3 /p/sync_datasheet_urls.py b.kicad_sch --dry-run' \
-    'python3 /p/skills/bom/scripts/sync_datasheet_urls.py --help' 'cat /p/skills/bom/scripts/edit_properties.py' 'grep -n argparse /p/skills/bom/scripts/sync_datasheet_urls.py' \
-    'ls /p/skills/bom/scripts/' 'python3 /p/skills/bom/scripts/bom_manager.py export b.kicad_sch'; do
-    check "opus Bash allowed: $c" k_pass opus Bash "$c"
-done
-check "Fable subagent under an Opus session may edit" k_pass opus Edit Board.zen fab1
-check "Fable subagent under an Opus session may run pcb layout" k_pass opus Bash "pcb layout --no-open B.zen" fab1
-check "Sonnet subagent under a Fable session is denied" k_deny fable Edit board.kicad_pcb son1
-check "subagent with no model on record is denied" k_deny fable Edit board.kicad_pcb new1
-check "that denial says to read first" k_reason "read call first" fable Edit board.kicad_pcb new1
-check "subagent with no transcript file is denied" k_deny fable Edit board.kicad_pcb gone1
-check "main session with no assistant message is denied" k_deny empty Edit board.kicad_pcb
-check "missing transcript is denied" k_deny nosuch Edit board.kicad_pcb
-check "deny reason names the model" k_reason "claude-opus-5-5" opus Edit board.kicad_pcb
-check "deny reason names pcb-author" k_reason "pcb-author" opus Edit board.kicad_pcb
-kguard_off() { local o; o=$(k_json opus Edit board.kicad_pcb | GUARD_KICAD_OFF=1 "$KGUARD"); [ -z "$o" ]; }
-kguard_nojq_fails() { local e rc; e=$(printf '{}' | env PATH=/nonexistent /bin/bash "$KGUARD" 2>&1 >/dev/null); rc=$?; [ "$rc" -eq 1 ] && printf '%s' "$e" | grep -q "install jq"; }
-check "GUARD_KICAD_OFF=1 disables the hook" kguard_off
-check "KiCad guard: missing jq fails closed (exit 1 + message)" kguard_nojq_fails
-check "KiCad guard: empty input is no decision" bash -c "o=\$(printf '{}' | '$KGUARD'); [ -z \"\$o\" ]"
-rm -rf "$KT"
 
 echo "-- git-write guard hook on synthetic input"
 GGUARD="${BENCH_GITGUARD:-$REPO_DIR/adapters/claude/hooks/guard-git-write.sh}"
@@ -339,11 +330,26 @@ check "git guard: non-JSON input is no decision, exit 0" bash -c "o=\$(printf 'n
 check "git guard: non-Bash tool is no decision" bash -c "o=\$(jq -n '{tool_name:\"Edit\",tool_input:{command:\"git push\",file_path:\"x\"}}' | '$GGUARD'); [ -z \"\$o\" ]"
 
 echo "-- instructions and skills"
-check "CLAUDE.md names the KiCad guard hook" grep -q "guard-kicad-edit.sh" "$REPO_DIR/adapters/claude/CLAUDE.md"
-lines=$(wc -l < "$REPO_DIR/adapters/claude/CLAUDE.md" | tr -d ' ')
+# CLAUDE.md reaches every agent; the orchestrator output style only the main session and forks
+CM="$REPO_DIR/adapters/claude/CLAUDE.md"; OS="$REPO_DIR/adapters/claude/output-styles/orchestrator.md"
+lines=$(wc -l < "$CM" | tr -d ' '); chars=$(wc -c < "$CM" | tr -d ' ')
 check "CLAUDE.md under 200 lines (is $lines)" test "$lines" -lt 200
-check "CLAUDE.md names the guard hook" grep -q "guard-main-session.sh" "$REPO_DIR/adapters/claude/CLAUDE.md"
-check "CLAUDE.md does not claim Plan follows CLAUDE_CODE_SUBAGENT_MODEL" bash -c "! grep -qiE 'Plan[^.]*fall(s)? back to Sonnet' '$REPO_DIR/adapters/claude/CLAUDE.md'"
+check "CLAUDE.md under 5000 characters, since every subagent reads it (is $chars)" test "$chars" -lt 5000
+check "CLAUDE.md: the no-commit rule" grep -q "don't commit or push" "$CM"
+check "CLAUDE.md: the uv rule" grep -q 'Use `uv` for all Python' "$CM"
+check "CLAUDE.md: subagents don't call the advisor tool" grep -q "Subagents don't call the advisor tool" "$CM"
+check "CLAUDE.md: never set disableClaudeAiConnectors" grep -q "Never set \`disableClaudeAiConnectors\`" "$CM"
+check "CLAUDE.md points at the orchestrator output style" grep -q '`orchestrator` output style' "$CM"
+check "output style: name is orchestrator" test "$(fm "$OS" name)" = orchestrator
+check "output style: keep-coding-instructions is true" test "$(fm "$OS" keep-coding-instructions)" = true
+check "output style: checks go to verifier" grep -q 'Checks go to `verifier`' "$OS"
+check "output style: the verifier rule overrides the Agent tool's advice" grep -q "overrides the Agent tool's advice to run a check inline" "$OS"
+check "output style: the connector launchers (claude-all, masters)" bash -c "grep -q claude-all '$OS' && grep -q masters '$OS'"
+check "output style: when to use the advisor" grep -q "The advisor is" "$OS"
+for f in "$CM" "$OS"; do
+    check "${f##*/}: does not claim Plan follows CLAUDE_CODE_SUBAGENT_MODEL" bash -c "! grep -qiE 'Plan[^.]*fall(s)? back to Sonnet' '$f'"
+    check "${f##*/}: names no removed skill or hook (kicad-review, pcb-author, pcb-enclosure, guard-kicad-edit)" bash -c "! grep -qE 'kicad-review|pcb-author|pcb-enclosure|guard-kicad-edit' '$f'"
+done
 check "check-skills.sh --quiet --no-refs passes" "$REPO_DIR/scripts/check-skills.sh" --quiet --no-refs
 check "install.sh passes bash -n" bash -n "$REPO_DIR/install.sh"
 
@@ -387,8 +393,8 @@ EOF
         NOTOOLS=(--disallowedTools "Read,Grep,Glob,Bash,Edit,Write,WebFetch,WebSearch")
 
         if want L1; then
-            run L1 sonnet "${NOTOOLS[@]}" -- "Without using any tool: your instructions mention a PreToolUse hook script. Reply with only that script's file name."
-            if grep -q "guard-main-session" "$BENCH_DIR/L1.txt"; then ok "L1 user CLAUDE.md loaded in main session"; else bad "L1 user CLAUDE.md loaded in main session" "got: $(out L1)"; fi
+            run L1 sonnet "${NOTOOLS[@]}" -- "Without using any tool: your instructions name one settings key that must never be set in a settings file. Reply with only that key."
+            if grep -q "disableClaudeAiConnectors" "$BENCH_DIR/L1.txt"; then ok "L1 user CLAUDE.md loaded in main session"; else bad "L1 user CLAUDE.md loaded in main session" "got: $(out L1)"; fi
         fi
         if want L2; then
             run L2 sonnet "${NOTOOLS[@]}" -- "Without using any tool: reply with only the bench sentinel word from the project instructions. If you have no such word, reply NONE."
@@ -399,8 +405,8 @@ EOF
             if grep -q "$SENTINEL" "$BENCH_DIR/L3.txt"; then ok "L3 general-purpose subagent received project CLAUDE.md"; else bad "L3 general-purpose subagent received project CLAUDE.md" "got: $(out L3)"; fi
         fi
         if want L4; then
-            run L4 sonnet "${NOTOOLS[@]}" -- "Use the Agent tool once with subagent_type \"Explore\" and exactly this prompt: 'Without using any tool, reply with only the bench sentinel word from the project instructions you were given. If you have no such word, reply NONE.' Then reply with only the subagent's answer, verbatim."
-            if grep -q "$SENTINEL" "$BENCH_DIR/L4.txt"; then bad "L4 Explore skips CLAUDE.md" "Explore knew the sentinel: $(out L4)"; else ok "L4 Explore skips CLAUDE.md (answer: $(out L4 | head -c 60))"; fi
+            run L4 sonnet "${NOTOOLS[@]}" -- "Use the Agent tool once with subagent_type \"Explore\" and the prompt 'Reply with only the word OK. Use no tools.' If that agent type is not available or the call is refused, do not use another agent type; reply with only: unavailable. Otherwise reply with only: done."
+            if grep -q '"agent_type":"Explore"' "$LOG"; then bad "L4 Explore is denied" "an Explore subagent started; got: $(out L4)"; else ok "L4 Explore is denied (answer: $(out L4 | head -c 60))"; fi
         fi
         if want L5; then
             run L5 sonnet -- "Run exactly this with the Bash tool, once: touch main-ran.marker && pytest --version . Then reply with one line saying whether it ran or was blocked, quoting any block message."
@@ -421,9 +427,8 @@ EOF
             if grep -q '"agent_type":"deep-reasoner"' "$LOG" && grep -q '"agent_type":"fast-executor"' "$LOG" && grep -q '"agent_type":"general-purpose"' "$LOG"; then ok "L8 SubagentStart logged all three agent types"; else bad "L8 SubagentStart logged all three agent types" "see $LOG"; fi
         fi
         if want L9; then
-            run L9 sonnet "${NOTOOLS[@]}" -- "Use the Agent tool once with subagent_type \"Explore\" and the prompt 'Reply with only the word OK. Use no tools.' Then reply with only: done."
-            m=$(models L9)
-            if echo "$m" | grep -q haiku; then ok "L9 Explore ran on haiku from a sonnet main [$m]"; else bad "L9 Explore ran on haiku from a sonnet main" "modelUsage: ${m:-empty}; got: $(out L9)"; fi
+            run L9 sonnet "${NOTOOLS[@]}" -- "Without using any tool, answer from your instructions in two lines. Line 1: the name of the shell launcher that starts a session in any folder with the claude.ai connectors on. Line 2: the subagent type that runs tests, builds and validation batches."
+            if grep -q "claude-all" "$BENCH_DIR/L9.txt" && grep -qi "verifier" "$BENCH_DIR/L9.txt"; then ok "L9 orchestrator output style loaded in main session"; else bad "L9 orchestrator output style loaded in main session" "got: $(out L9)"; fi
         fi
         if [ "$KEEP" = 1 ]; then echo "  kept: $BENCH_DIR"; else rm -rf "$BENCH_DIR"; fi
     fi
