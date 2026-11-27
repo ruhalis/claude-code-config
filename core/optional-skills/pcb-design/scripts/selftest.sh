@@ -17,16 +17,23 @@
 #               Diode's pcb writes it); gate/aquila-fc.kicad_dru with a (severity ignore) rule
 #   jlcsearch_responses.json  saved /api/search bodies, real and edited (its _note says which)
 # Asserts: pin_diff.py exit codes (0 clean, 2 error rows, 1 misuse) and its OK/CAUTION/HEADER-ONLY/RESERVED/
-# NAME-MISMATCH/DUPLICATE rows, on KiCad 10 and pre-10 (no _<pad>) pin names; fabset.py check, the file-set and
+# NAME-MISMATCH/DUPLICATE rows, on KiCad 10 and pre-10 (no _<pad>) pin names; GPIO35-37 by module variant (octal
+# RESERVED, quad free, unknown CAUTION, --psram); header values (GPIO_NUM_<n>, hex, casts, NC, unparsable lines
+# exit 1); fabset.py check, the file-set and
 # BOM/CPL designator-set check fab_export.sh runs, on a good set and broken ones; fabset.py manifest on stand-in
 # files (sheets referenced from the root, a missing one, a G85 slot, a pin diff older than board.net, the git line
 # clean and then DIRTY with sheets modified in a sub- and a sibling directory); fab_diff.sh
 # on a re-stamped set and a changed one; erc_drc.sh through a stand-in kicad-cli (the three DRC counts in both
 # runs, exit 5 raised from 0, --schematic-parity and --all-track-errors on both runs, disabled checks and
-# exclusions, the gate record); pin_diff.py --record; fab_export.sh through the stand-in: exit 4 with nothing
-# written when a gate is not run, stale (board or header changed) or failing, a full set when every gate passes,
-# --accept and --no-pin-header in MANIFEST.txt; parts_check.py on the saved responses; no __pycache__ left in the
-# skill.
+# exclusions, the gate record); downgraded critical rules (record exit 5, gate block, --accept waives it);
+# malformed reports (not recorded, an earlier pass removed); the netlist record of export_review.sh sch (a
+# schematic edit after the export, a hand-replaced board.net, sheets changed during the export, a failed export);
+# pin_diff.py --record; fab_export.sh through the stand-in: exit 4 with nothing written when a gate is not run,
+# stale (board or header changed) or failing, a full set when every gate passes, --accept waiving only failing
+# counts and downgraded rules (refused for not run, stale, no parity, no refilled run, unreadable gate.json),
+# --no-pin-header refused while a pin diff is recorded and named in MANIFEST.txt when honoured, an outdir that
+# holds an earlier set refused, nothing left behind by a failed export or by an input changed during it; parts_check.py on the saved responses; no
+# __pycache__ left in the skill.
 # Runs python with PYTHONDONTWRITEBYTECODE=1.
 # Exit 0: every assertion passed. 1: at least one failed (each printed as FAIL with its output).
 set -uo pipefail
@@ -92,7 +99,7 @@ has   "same summary"                       '^errors=0 warnings=5 info=1 '
 { cat "${FIX}/pins.h"; echo '#define PIN_FLOW_MOT 35'; } > "${T}/io35.h"
 expect 2 "define on an unconnected pin (IO35, octal PSRAM on N16R8)" pd "${FIX}/board.net" "${T}/io35.h"
 has   "HEADER-ONLY row"                    '^35 +PIN_FLOW_MOT +unconnected-\(U1-IO35-Pad28\) +HEADER-ONLY '
-has   "CAUTION row for 35"                 '^35 +PIN_FLOW_MOT .* CAUTION '
+has   "RESERVED row for 35 (N16R8)"        '^35 +PIN_FLOW_MOT .* RESERVED +octal PSRAM line'
 
 { cat "${FIX}/pins.h"; echo '#define PIN_SPARE 30'; } > "${T}/io30.h"
 expect 2 "define on a flash line (GPIO30)" pd "${FIX}/board.net" "${T}/io30.h"
@@ -105,6 +112,57 @@ has   "NAME-MISMATCH row"                  '^17 +PIN_BEEPER +/BUZZER +NAME-MISMA
 { cat "${FIX}/pins.h"; echo '#define PIN_MOTOR_ALT 4'; } > "${T}/dup.h"
 expect 0 "two defines on GPIO4" pd "${FIX}/board.net" "${T}/dup.h"
 has   "DUPLICATE row"                      '^4 +PIN_MOTOR_FR,PIN_MOTOR_ALT .* DUPLICATE '
+
+echo "== pin_diff.py: GPIO35-37 by module variant"
+sed 's/unconnected-(U1-IO35-Pad28)/\/FLOW_MOT/' "${FIX}/board.net" > "${T}/io35_n16r8.net"
+expect 2 "GPIO35 wired on an N16R8 (octal PSRAM)" pd "${T}/io35_n16r8.net" "${T}/io35.h"
+has   "RESERVED error row"                 '^35 +PIN_FLOW_MOT +/FLOW_MOT +RESERVED +octal PSRAM line'
+lacks "no CAUTION row for 35"              '^35 .* CAUTION '
+has   "variant named"                      '^module U1: octal PSRAM \(value ESP32-S3-WROOM-1-N16R8\)$'
+sed 's/"ESP32-S3-WROOM-1-N16R8"/"ESP32-S3-WROOM-1-N8R2"/' "${T}/io35_n16r8.net" > "${T}/io35_n8r2.net"
+expect 0 "GPIO35 on an N8R2 (quad PSRAM): free" pd "${T}/io35_n8r2.net" "${T}/io35.h"
+has   "OK row"                             '^35 +PIN_FLOW_MOT +/FLOW_MOT +OK '
+lacks "no RESERVED or CAUTION row for 35"  '^35 .* (RESERVED|CAUTION) '
+sed 's/"ESP32-S3-WROOM-1-N16R8"/"ESP32-S3-WROOM-1-N8"/' "${T}/io35_n16r8.net" > "${T}/io35_n8.net"
+expect 0 "GPIO35 on an N8 (no PSRAM): free" pd "${T}/io35_n8.net" "${T}/io35.h"
+lacks "no RESERVED or CAUTION row for 35"  '^35 .* (RESERVED|CAUTION) '
+sed 's/"ESP32-S3-WROOM-1-N16R8"/"ESP32-S3-WROOM-1"/' "${T}/io35_n16r8.net" > "${T}/io35_any.net"
+expect 0 "GPIO35, value without an ordering code" pd "${T}/io35_any.net" "${T}/io35.h"
+has   "CAUTION, variant unknown"           '^35 +PIN_FLOW_MOT .* CAUTION +octal-PSRAM pin on an unknown variant'
+expect 0 "--psram quad for that value" pd "${T}/io35_any.net" "${T}/io35.h" --psram quad
+lacks "no CAUTION row for 35"              '^35 .* CAUTION '
+expect 2 "--psram octal for that value" pd "${T}/io35_any.net" "${T}/io35.h" --psram octal
+has   "RESERVED row"                       '^35 +PIN_FLOW_MOT .* RESERVED '
+expect 1 "misuse: --psram contradicting the value" pd "${T}/io35_n16r8.net" "${T}/io35.h" --psram none
+has   "says so"                            'contradicts the value of U1'
+
+echo "== pin_diff.py: header values"
+cat > "${T}/values.h" <<'H'
+#define PIN_MOTOR_FR    GPIO_NUM_4
+#define PIN_I2C_SDA     0x08
+#define PIN_BUZZER      ((gpio_num_t)17)
+#define PIN_USB_DN      (gpio_num_t)GPIO_NUM_19
+#define PIN_USB_DP      (20)
+#define PIN_UART0_TX    ( (gpio_num_t) (0x2B) )
+#define PIN_UART0_RX    44
+#define PIN_SPARE       GPIO_NUM_NC
+#define PIN_OFF         (-1)
+H
+expect 0 "GPIO_NUM_<n>, hex, casts, parentheses, NC" pd "${FIX}/board.net" "${T}/values.h"
+has   "GPIO_NUM_4"                         '^4 +PIN_MOTOR_FR +/MOTOR_FR +OK '
+has   "0x08 is GPIO8"                      '^8 +PIN_I2C_SDA +/I2C_SDA +OK '
+lacks "nothing read as GPIO0"              '^0 +PIN_'
+has   "((gpio_num_t)17)"                   '^17 +PIN_BUZZER +/BUZZER +OK '
+has   "a cast of GPIO_NUM_19"              '^19 +PIN_USB_DN +/USB_DN +OK '
+has   "a cast of hex, parenthesised"       '^43 +PIN_UART0_TX +/UART0_TX +OK '
+has   "GPIO_NUM_NC: NC info row"           '^NC +PIN_SPARE +- +NC '
+has   "-1: NC info row"                    '^NC +PIN_OFF +- +NC '
+has   "summary: two more info rows"        '^errors=0 warnings=5 info=3 +\(header pins: 7, '
+printf '#define PIN_MOTOR_FR 4\n/* a\n   comment */\n#define PIN_LED (PIN_BASE + 1)\n#define PIN_FAST 5U\n' > "${T}/unparsable.h"
+expect 1 "unparsable #define PIN_ lines" pd "${FIX}/board.net" "${T}/unparsable.h"
+has   "named with their line numbers"      'line 4: #define PIN_LED \(PIN_BASE \+ 1\); line 5: #define PIN_FAST 5U$'
+expect 0 "--pin-regex as before" pd "${FIX}/board.net" "${FIX}/pins.h" --pin-regex '^\s*#define\s+(PIN_\w+)\s+\(?(\d+)\)?'
+has   "same summary"                       '^errors=0 warnings=5 info=1 '
 
 echo '/* no pins */' > "${T}/empty.h"
 expect 1 "misuse: --mcu not in netlist" pd "${FIX}/board.net" "${FIX}/pins.h" --mcu U99
@@ -259,28 +317,43 @@ echo "$*" >> "${STUB_LOG}"
 [[ "$1" == version ]] && { echo 10.0.5; exit 0; }
 case "$1 $2" in
   "sch erc") cp "${STUB_ERC}" "${o}" 2>/dev/null; exit "${STUB_ERC_RC:-0}" ;;
-  "pcb drc") if [[ ${refill} -eq 1 ]]; then cp "${STUB_DRC_REFILLED}" "${o}" 2>/dev/null; exit 0; fi
+  "pcb drc") if [[ ${refill} -eq 1 ]]; then cp "${STUB_DRC_REFILLED}" "${o}" 2>/dev/null; exit "${STUB_REFILL_RC:-0}"; fi
+             [[ -n "${STUB_DRC_TOUCH:-}" ]] && echo '# saved during the run' >> "${STUB_DRC_TOUCH}"
              cp "${STUB_DRC}" "${o}" 2>/dev/null; exit "${STUB_DRC_RC:-0}" ;;
-  "sch export") cp "${STUB_FIX}/fab/bom.csv" "${o}" ;;
+  "sch export")
+    case "$3" in
+      netlist) [[ -n "${STUB_NET_TOUCH:-}" ]] && echo '; edited during the export' >> "${STUB_NET_TOUCH}"
+               [[ -n "${STUB_NET_FAIL:-}" ]] && exit 1
+               cp "${STUB_FIX}/board.net" "${o}" ;;
+      pdf) printf '%%PDF-1.4\n' > "${o}" ;;
+      *) cp "${STUB_FIX}/fab/bom.csv" "${o}" ;;
+    esac ;;
   "pcb export")
     case "$3" in
       gerbers|drill) python3 "${STUB_GEN}" "${STUB_FIX}/fab/gerber/aquila-fc-job.gbrjob" "${o}" 2026-11-27T10:00:00+05:00 "$3" ;;
-      pos) python3 "${STUB_GEN}" pos "${STUB_FIX}/fab/cpl.csv" "${o}" ;;
+      pos) [[ -n "${STUB_POS_FAIL:-}" ]] && exit 1
+           [[ -n "${STUB_POS_TOUCH:-}" ]] && echo '; edited during the export' >> "${STUB_POS_TOUCH}"
+           python3 "${STUB_GEN}" pos "${STUB_FIX}/fab/cpl.csv" "${o}" ;;
       *) exit 1 ;;
     esac ;;
   *) exit 1 ;;
 esac
 STUB
 chmod +x "${T}/app/Contents/MacOS/kicad-cli"
-export STUB_LOG="${T}/stub.log" STUB_FIX="${FIX}" STUB_GEN="${T}/gen.py"
+printf '#!/bin/sh\nexit 0\n' > "${T}/pdftoppm"; chmod +x "${T}/pdftoppm"   # export_review.sh rasterises nothing
+export STUB_LOG="${T}/stub.log" STUB_FIX="${FIX}" STUB_GEN="${T}/gen.py" PDFTOPPM="${T}/pdftoppm"
 stub() { KICAD_APP="${T}/app" "$@"; }
+EXPORT="${SKILL_DIR}/scripts/export_review.sh"
 # mkboard <dir>: a stand-in board aquila-fc (4 copper layers in its (layers ...) header) with the gate fixtures'
-# .kicad_pro and .kicad_dru, and the fixture netlist as review/board.net
+# .kicad_pro and .kicad_dru, and the fixture netlist as review/board.net through export_review.sh sch
 mkboard() {
   mkdir -p "$1/review" && printf '(kicad_sch)\n' > "$1/aquila-fc.kicad_sch" && \
   printf '(kicad_pcb\n  (layers\n    (0 "F.Cu" signal)\n    (4 "In1.Cu" power)\n    (6 "In2.Cu" power)\n    (2 "B.Cu" signal)\n  )\n)\n' > "$1/aquila-fc.kicad_pcb" && \
-  cp "${G}/aquila-fc.kicad_pro" "${G}/aquila-fc.kicad_dru" "$1/" && cp "${FIX}/board.net" "$1/review/board.net"
+  cp "${G}/aquila-fc.kicad_pro" "${G}/aquila-fc.kicad_dru" "$1/" && stub bash "${EXPORT}" sch "$1" >/dev/null 2>&1
 }
+fstart() { python3 "${FAB}" start "$@" >/dev/null; }   # fstart erc|drc <file> <review>: what erc_drc.sh does first
+# has_entry <board dir> <name>: exit 0 when review/gate.json holds that entry
+has_entry() { python3 -c 'import json, sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$1/review/gate.json" "$2"; }
 B2="${T}/gp/aquila-fc"; mkboard "${B2}" || { echo "cannot build the stand-in board" >&2; exit 1; }
 cp "${FIX}/pins.h" "${T}/gp/pins.h"
 pcb2="${B2}/aquila-fc.kicad_pcb"; sch2="${B2}/aquila-fc.kicad_sch"
@@ -312,11 +385,96 @@ has   "erc exclusions"                     '^exclusions: 2$'
 has   "warnings do not block"              '^gate: erc pass, recorded in '
 expect 1 "misuse: erc on a .kicad_pcb" stub bash "${ERCDRC}" erc "${pcb2}"
 B3="${T}/np"; mkdir -p "${B3}/review"; printf '(kicad_sch)\n' > "${B3}/np.kicad_sch"; cp "${G}/noerc.kicad_pro" "${B3}/np.kicad_pro"
-cp "${G}/erc_warning.json" "${B3}/review/erc.json"
-expect 0 "record erc, .kicad_pro without an erc section" python3 "${FAB}" record erc "${B3}/np.kicad_sch" "${B3}/review"
+fstart erc "${B3}/np.kicad_sch" "${B3}/review"
+sed 's/"aquila-fc\.kicad_sch"/"np.kicad_sch"/' "${G}/erc_warning.json" > "${B3}/review/erc.json"
+expect 0 "record erc, .kicad_pro without an erc section" python3 "${FAB}" record erc "${B3}/np.kicad_sch" "${B3}/review" --rc 0
 has   "names from the report"              '^disabled checks: four_way_junction, single_global_label$'
 has   "no erc section said"                'note: np\.kicad_pro has no erc section: KiCad.s built-in severities apply$'
 has   "no exclusions"                      '^exclusions: 0$'
+
+echo "== downgraded rules (.kicad_pro severities below KiCad's defaults)"
+B7="${T}/soft/aquila-fc"; mkboard "${B7}"
+python3 - "${B7}/aquila-fc.kicad_pro" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["board"]["design_settings"]["rule_severities"].update({"clearance": "warning", "missing_footprint": "warning"})
+d["erc"]["rule_severities"].update({"pin_not_connected": "warning", "pin_to_pin": "warning"})
+json.dump(d, open(p, "w"), indent=2)
+PY
+printf '(rule "Soft clearance"\n  (constraint clearance (min 0.5mm))\n  (severity warning))\n' >> "${B7}/aquila-fc.kicad_dru"
+export STUB_DRC="${G}/drc_clean.json" STUB_DRC_REFILLED="${G}/drc_clean.json" STUB_DRC_RC=0
+expect 5 "drc clean, clearance at warning: raised to 5" stub bash "${ERCDRC}" drc "${B7}/aquila-fc.kicad_pcb"
+has   "downgraded checks line"             '^downgraded checks: clearance=warning \(default error, critical: blocks\), silk_overlap=ignore \(default warning\), dru:"Soft clearance"=warning \(custom rule, not blocking\)$'
+has   "disabled checks line kept"          '^disabled checks: missing_courtyard, track_not_centered_on_via, silk_overlap, dru:"Silenced rule"$'
+lacks "parity rule at its default not listed" 'missing_footprint'
+has   "gate record blocks"                 '^gate: drc BLOCKS \(critical rule below its floor: clearance=warning\)'
+export STUB_ERC="${G}/erc_warning.json" STUB_ERC_RC=0
+expect 5 "erc, pin_not_connected at warning: raised to 5" stub bash "${ERCDRC}" erc "${B7}/aquila-fc.kicad_sch"
+has   "erc downgraded line"                '^downgraded checks: pin_not_connected=warning \(default error, critical: blocks\)$'
+has   "gate record blocks"                 '^gate: erc BLOCKS \(critical rule below its floor: pin_not_connected=warning\)'
+expect 0 "fixture .kicad_pro: no critical rule downgraded" stub bash "${ERCDRC}" erc "${sch2}"
+has   "erc downgraded: none"               '^downgraded checks: none$'
+
+echo "== malformed reports are not recorded"
+B8="${T}/bad/aquila-fc"; mkboard "${B8}"; pcb8="${B8}/aquila-fc.kicad_pcb"
+rec_drc() { python3 "${FAB}" record drc "${pcb8}" "${B8}/review" --flags="--severity-all --schematic-parity --all-track-errors" --rc 0; }
+# put8: a started DRC run with a clean refilled report; the saved-fill report is written after it
+put8() { fstart drc "${pcb8}" "${B8}/review" && cp "${G}/drc_clean.json" "${B8}/review/drc_refilled.json"; }
+put8; cp "${G}/drc_clean.json" "${B8}/review/drc.json"
+expect 0 "a clean report records a pass" rec_drc
+put8; printf '{}\n' > "${B8}/review/drc.json"
+expect 1 "{} as drc.json" rec_drc
+has   "not a report"                       '^gate: drc not recorded \(.*drc\.json is not a kicad-cli DRC report: its source is None, not aquila-fc\.kicad_pcb\)'
+if has_entry "${B8}" drc; then out="$(cat "${B8}/review/gate.json")"; bad "the earlier drc pass is still in gate.json"; else ok "the earlier drc pass is removed"; fi
+put8; cp "${G}/drc_clean.json" "${B8}/review/drc.json"; rec_drc >/dev/null 2>&1
+put8; printf '[]\n' > "${B8}/review/drc.json"
+expect 1 "[] as drc.json" rec_drc
+has   "not an object"                      'drc\.json is not a kicad-cli DRC report: not a JSON object'
+if has_entry "${B8}" drc; then out="$(cat "${B8}/review/gate.json")"; bad "the earlier drc pass survived a non-object report"; else ok "the earlier drc pass is removed"; fi
+put8; sed 's/"aquila-fc\.kicad_pcb"/"other.kicad_pcb"/' "${G}/drc_clean.json" > "${B8}/review/drc.json"
+expect 1 "a report on another file" rec_drc
+has   "source named"                       "its source is 'other\.kicad_pcb', not aquila-fc\.kicad_pcb"
+put8; grep -v '"unconnected_items"' "${G}/drc_clean.json" > "${B8}/review/drc.json"
+expect 1 "a report without unconnected_items" rec_drc
+has   "missing array named"                'no unconnected_items list'
+put8; cp "${G}/drc_clean.json" "${B8}/review/drc.json"; printf '{"source": "aquila-fc.kicad_pcb"}\n' > "${B8}/review/drc_refilled.json"
+expect 1 "a malformed refilled report" rec_drc
+has   "refilled report named"              'drc_refilled\.json is not a kicad-cli DRC report: no violations list'
+fstart erc "${B8}/aquila-fc.kicad_sch" "${B8}/review"
+printf '{"source": "aquila-fc.kicad_sch", "sheets": [{"path": "/", "violations": [{"type": "x"}]}]}\n' > "${B8}/review/erc.json"
+expect 1 "an ERC item without a severity" python3 "${FAB}" record erc "${B8}/aquila-fc.kicad_sch" "${B8}/review" --rc 0
+has   "says so"                            'an item in sheets\[0\]\.violations has no severity'
+printf '{}\n' > "${T}/empty.json"
+export STUB_DRC="${T}/empty.json"
+expect 1 "erc_drc.sh drc with {} from kicad-cli" stub bash "${ERCDRC}" drc "${pcb8}"
+has   "record failed"                      'gate record failed \(exit 1\): its entry was removed'
+
+echo "== a record needs its own start and a completed kicad-cli run"
+B9="${T}/rerec/aquila-fc"; mkboard "${B9}"; pcb9="${B9}/aquila-fc.kicad_pcb"; sch9="${B9}/aquila-fc.kicad_sch"
+export STUB_DRC="${G}/drc_clean.json" STUB_DRC_REFILLED="${G}/drc_clean.json" STUB_DRC_RC=0
+stub bash "${ERCDRC}" drc "${pcb9}" >/dev/null 2>&1
+echo '# edited after the DRC' >> "${pcb9}"
+expect 1 "bare record of the old reports after a board edit" python3 "${FAB}" record drc "${pcb9}" "${B9}/review" --flags="--severity-all --schematic-parity --all-track-errors" --rc 0
+has   "no start state"                     '^gate: drc not recorded \(no start state for this run'
+if has_entry "${B9}" drc; then out="$(cat "${B9}/review/gate.json")"; bad "drc entry left"; else ok "no drc entry"; fi
+fstart drc "${pcb9}" "${B9}/review"
+if [[ ! -e "${B9}/review/drc.json" && ! -e "${B9}/review/drc_refilled.json" ]]; then ok "start removed the old reports"; else bad "old reports kept by start"; fi
+expect 1 "start, then record without a kicad-cli run" python3 "${FAB}" record drc "${pcb9}" "${B9}/review" --flags="--severity-all --schematic-parity --all-track-errors" --rc 0
+has   "no report"                          '^gate: drc not recorded \(no .*/drc\.json\)'
+expect 1 "the board saved during the DRC run" stub env STUB_DRC_TOUCH="${pcb9}" bash "${ERCDRC}" drc "${pcb9}"
+has   "named"                              'gate: drc not recorded \(changed during the run: aquila-fc\.kicad_pcb changed\)'
+if has_entry "${B9}" drc; then out="$(cat "${B9}/review/gate.json")"; bad "drc entry recorded after a save during the run"; else ok "no drc entry"; fi
+expect 0 "a run on an unchanged board records" stub bash "${ERCDRC}" drc "${pcb9}"
+export STUB_ERC="${G}/erc_warning.json" STUB_ERC_RC=3
+expect 3 "kicad-cli exit 3 with a report written: exit 3 kept" stub bash "${ERCDRC}" erc "${sch9}"
+has   "not recorded"                       'gate: erc not recorded \(kicad-cli exit 3: the check did not complete\)'
+if has_entry "${B9}" erc; then out="$(cat "${B9}/review/gate.json")"; bad "erc entry recorded after kicad-cli exit 3"; else ok "no erc entry"; fi
+export STUB_ERC_RC=0 STUB_REFILL_RC=3
+expect 1 "refilled DRC run exits 3" stub bash "${ERCDRC}" drc "${pcb9}"
+has   "not recorded"                       'gate: drc not recorded \(kicad-cli exit 3: the check did not complete\)'
+if has_entry "${B9}" drc; then out="$(cat "${B9}/review/gate.json")"; bad "drc entry recorded after a refilled run exit 3"; else ok "no drc entry"; fi
+export STUB_REFILL_RC=0
 
 echo "== pin_diff.py --record"
 expect 1 "misuse: --record with another netlist" pd "${FIX}/board.net" "${T}/gp/pins.h" --record "${B2}"
@@ -324,8 +482,43 @@ expect 0 "--record" pd "${B2}/review/board.net" "${T}/gp/pins.h" --record "${B2}
 has   "recorded"                           '^gate: pin_diff pass, recorded in .*/review/gate\.json$'
 has   "table unchanged"                    '^errors=0 warnings=5 info=1 '
 
+echo "== netlist record (export_review.sh sch)"
+B6="${T}/net/aquila-fc"; mkboard "${B6}"; pcb6="${B6}/aquila-fc.kicad_pcb"; sch6="${B6}/aquila-fc.kicad_sch"
+cp "${FIX}/pins.h" "${T}/net/pins.h"
+expect 0 "export_review.sh sch" stub bash "${EXPORT}" sch "${B6}"
+has   "netlist recorded"                   '^gate: netlist recorded in .*/review/gate\.json \(tied to 1 sheet\)$'
+export STUB_DRC="${G}/drc_clean.json" STUB_DRC_REFILLED="${G}/drc_clean.json" STUB_DRC_RC=0 STUB_ERC="${G}/erc_warning.json" STUB_ERC_RC=5
+checks6() { stub bash "${ERCDRC}" erc "${sch6}" >/dev/null 2>&1; stub bash "${ERCDRC}" drc "${pcb6}" >/dev/null 2>&1
+            pd "${B6}/review/board.net" "${T}/net/pins.h" --record "${B6}" >/dev/null 2>&1; }
+gate6() { python3 "${FAB}" gate --pcb "${pcb6}" --sch "${sch6}" "$@"; }
+checks6
+expect 0 "gate passes on the recorded netlist" gate6
+echo '; edited after the export' >> "${sch6}"; checks6
+expect 4 "refused: schematic edited after the export, every check but the export re-run" gate6
+has   "stale netlist named"                '^  pin_diff: +BLOCKED: stale netlist: netlist exported from older sheets \(aquila-fc\.kicad_sch changed\); re-run export_review\.sh sch, then pin_diff\.py --record \[cannot be accepted\]'
+lacks "erc and drc current"                '^  (erc|drc): +BLOCKED'
+expect 4 "--accept cannot waive a stale netlist" gate6 --accept "user accepted: selftest"
+has   "says which block"                   '^--accept cannot waive: pin_diff: stale netlist: '
+stub bash "${EXPORT}" sch "${B6}" >/dev/null 2>&1; checks6
+expect 0 "re-exported, pin diff re-run: pass" gate6
+{ cat "${FIX}/board.net"; echo; } > "${B6}/review/board.net"; checks6
+expect 0 "--record on a board.net that is not the export: rows decide the exit" pd "${B6}/review/board.net" "${T}/net/pins.h" --record "${B6}"
+has   "record line says the gate blocks"   '^gate: pin_diff recorded in .*, but the gate blocks: stale netlist: review/board\.net is not the netlist export_review\.sh recorded; re-run export_review\.sh sch'
+lacks "no plain pass"                      '^gate: pin_diff pass'
+expect 4 "refused: board.net replaced after the export" gate6
+has   "not the recorded netlist"           'stale netlist: review/board\.net is not the netlist export_review\.sh recorded'
+expect 1 "a sheet changed during the export" stub env STUB_NET_TOUCH="${sch6}" bash "${EXPORT}" sch "${B6}"
+has   "says so"                            'netlist not recorded: the sheets changed during the export \(aquila-fc\.kicad_sch changed\)'
+if [[ ! -e "${B6}/review/board.net" ]]; then ok "no board.net left"; else bad "board.net left after a refused record"; fi
+if has_entry "${B6}" netlist; then out="$(cat "${B6}/review/gate.json")"; bad "netlist record left"; else ok "no netlist record left"; fi
+stub bash "${EXPORT}" sch "${B6}" >/dev/null 2>&1
+expect 1 "failed netlist export" stub env STUB_NET_FAIL=1 bash "${EXPORT}" sch "${B6}"
+if [[ ! -e "${B6}/review/board.net" ]]; then ok "no board.net left"; else bad "an earlier board.net survived a failed export"; fi
+if has_entry "${B6}" netlist; then out="$(cat "${B6}/review/gate.json")"; bad "netlist record left"; else ok "no netlist record left"; fi
+
 echo "== fab_export.sh gates (stand-in kicad-cli)"
 fx() { stub bash "${FABX}" "$@"; }
+partials() { find "${T}" -maxdepth 3 -name '*.partial.*' | grep -q .; }
 expect 0 "fab_export.sh --help" bash "${FABX}" --help
 has   "usage line"                         '^usage: fab_export\.sh \[--no-pin-header\] \[--accept'
 B4="${T}/fresh/aquila-fc"; mkboard "${B4}"; mkdir -p "${T}/out/empty"; : > "${STUB_LOG}"
@@ -338,8 +531,14 @@ if [[ -z "$(ls -A "${T}/out/empty")" ]]; then ok "output directory left empty"; 
 expect 4 "refused into a new directory" fx "${B4}/aquila-fc.kicad_pcb" "${B4}/aquila-fc.kicad_sch" "${T}/out/new"
 if [[ ! -e "${T}/out/new" ]]; then ok "output directory not created"; else bad "output directory created"; fi
 if grep -q '^pcb export' "${STUB_LOG}"; then out="$(cat "${STUB_LOG}")"; bad "kicad-cli plotted while refused"; else ok "nothing plotted while refused"; fi
+expect 4 "--accept cannot waive gates not run" fx --accept "user accepted: selftest" "${B4}/aquila-fc.kicad_pcb" "${B4}/aquila-fc.kicad_sch" "${T}/out/new"
+has   "marked on the gate line"            '^  erc: +BLOCKED: not run \[cannot be accepted\]'
+has   "named on the refusal line"          '^--accept cannot waive: erc: not run; drc: not run; pin_diff: not run$'
+if [[ ! -e "${T}/out/new" ]]; then ok "nothing written"; else bad "an --accept of gates not run wrote ${T}/out/new"; fi
 
 expect 0 "every gate current and passing" fx "${pcb2}" "${sch2}" "${T}/out/pass"
+has   "set moved into place"               "^set: ${T}/out/pass\$"
+if partials; then out="$(find "${T}" -maxdepth 3 -name '*.partial.*')"; bad "temporary directory left"; else ok "no temporary directory left"; fi
 out="$(cat "${T}/out/pass/MANIFEST.txt" 2>&1)"
 has   "manifest: gates pass"               '^gates: +pass$'
 has   "manifest: no gate flags"            '^gate flags: +none$'
@@ -349,9 +548,41 @@ has   "manifest: pin_diff gate"            '^  pin_diff: +pass: errors=0 warning
 has   "manifest: erc disabled checks"      '^erc disabled checks: four_way_junction, single_global_label$'
 has   "manifest: erc exclusions"           '^erc exclusions: 2$'
 has   "manifest: drc disabled checks"      '^drc disabled checks: missing_courtyard, track_not_centered_on_via, silk_overlap, dru:"Silenced rule"$'
+has   "manifest: drc downgraded checks"    '^drc downgraded checks: silk_overlap=ignore \(default warning\)$'
 has   "manifest: drc exclusions"           '^drc exclusions: 1$'
 has   "manifest: fab checks kept"          '^fab checks: +pass$'
 has   "manifest: uploads hashed"           '^  [0-9a-f]{64}  gerbers\.zip$'
+ln -s "${B2}" "${T}/out/boardlink"
+expect 1 "refused: outdir is a symlink to the board's own directory" fx "${pcb2}" "${sch2}" "${T}/out/boardlink"
+has   "says so"                            "outdir is the board's own directory"
+if [[ ! -e "${B2}/gerbers.zip" && ! -e "${B2}/gerber" ]]; then ok "nothing written into the board directory"; else bad "a set was written into the board directory"; fi
+
+expect 4 "--no-pin-header refused while a pin diff is recorded" fx --no-pin-header "${pcb2}" "${sch2}" "${T}/out/np_refused"
+has   "says why"                           '^  pin_diff: +BLOCKED: --no-pin-header given, but a pin diff is recorded for this board'
+expect 4 "--accept cannot waive that" fx --no-pin-header --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/np_refused"
+has   "named on the refusal line"          '^--accept cannot waive: pin_diff: --no-pin-header given'
+if [[ ! -e "${T}/out/np_refused" ]]; then ok "nothing written"; else bad "--no-pin-header over a recorded pin diff wrote ${T}/out/np_refused"; fi
+
+before="$(cksum < "${T}/out/pass/MANIFEST.txt")"
+expect 1 "refused: outdir holds an earlier set" fx "${pcb2}" "${sch2}" "${T}/out/pass"
+has   "says to use a new dated folder"     'already holds gerber from an earlier export; never export over a set: use a new dated folder'
+if [[ "$(cksum < "${T}/out/pass/MANIFEST.txt")" == "${before}" ]]; then ok "earlier set untouched"; else bad "earlier MANIFEST.txt rewritten"; fi
+mkdir -p "${T}/out/onlybom"; echo keep > "${T}/out/onlybom/bom.csv"
+expect 1 "refused: outdir holds a bom.csv" fx "${pcb2}" "${sch2}" "${T}/out/onlybom"
+has   "names the file"                     'already holds bom\.csv'
+if [[ "$(cat "${T}/out/onlybom/bom.csv")" == keep && "$(ls -A "${T}/out/onlybom")" == bom.csv ]]; then ok "bom.csv untouched, nothing added"; else out="$(ls -A "${T}/out/onlybom")"; bad "outdir changed"; fi
+expect 1 "pos export fails part-way" stub env STUB_POS_FAIL=1 bash "${FABX}" "${pcb2}" "${sch2}" "${T}/out2/day/new"
+has   "failure named"                      '^FAILED: pos export'
+if [[ ! -e "${T}/out2" ]]; then ok "nothing left behind, not even the parent directories"; else out="$(find "${T}/out2")"; bad "left behind"; fi
+mkdir -p "${T}/out/emptyfail"
+expect 1 "pos export fails into an empty outdir" stub env STUB_POS_FAIL=1 bash "${FABX}" "${pcb2}" "${sch2}" "${T}/out/emptyfail"
+if [[ -z "$(ls -A "${T}/out/emptyfail")" ]]; then ok "outdir still empty"; else out="$(ls -A "${T}/out/emptyfail")"; bad "outdir written"; fi
+if partials; then out="$(find "${T}" -maxdepth 3 -name '*.partial.*')"; bad "temporary directory left"; else ok "no temporary directory left"; fi
+
+expect 4 "the board changes during the export" stub env STUB_POS_TOUCH="${pcb2}" bash "${FABX}" "${pcb2}" "${sch2}" "${T}/out/during"
+has   "says an input changed"              '^NOT EXPORTED: an input changed during the export'
+has   "the recomputed gate names it"       '^  drc: +BLOCKED: stale: aquila-fc\.kicad_pcb changed'
+if [[ ! -e "${T}/out/during" ]] && ! partials; then ok "set discarded, no temporary directory"; else out="$(ls -A "${T}/out")"; bad "a set with BLOCKED gates landed"; fi
 
 echo '# edited' >> "${pcb2}"; echo '/* edited */' >> "${T}/gp/pins.h"
 expect 4 "refused: board and header changed since the checks" fx "${pcb2}" "${sch2}" "${T}/out/stale"
@@ -359,11 +590,9 @@ has   "drc stale names the board"          '^  drc: +BLOCKED: stale: aquila-fc\.
 has   "pin_diff stale names the header"    '^  pin_diff: +BLOCKED: stale: pins\.h changed'
 has   "erc still current"                  '^  erc: +pass: '
 if [[ ! -e "${T}/out/stale" ]]; then ok "nothing written"; else bad "stale export wrote ${T}/out/stale"; fi
-expect 0 "--accept exports despite stale gates" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/accept"
-out="$(cat "${T}/out/accept/MANIFEST.txt" 2>&1)"
-has   "manifest: ACCEPTED with the reason" '^gates: +ACCEPTED - user accepted: selftest$'
-has   "manifest: --accept verbatim"        '^gate flags: +--accept "user accepted: selftest"$'
-has   "manifest: blocking gate still shown" '^  drc: +BLOCKED: stale: aquila-fc\.kicad_pcb changed'
+expect 4 "--accept cannot waive stale gates" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/accept"
+has   "named on the refusal line"          '^--accept cannot waive: drc: stale: aquila-fc\.kicad_pcb changed; pin_diff: stale: pins\.h changed$'
+if [[ ! -e "${T}/out/accept" ]]; then ok "nothing written"; else bad "an --accept of stale gates wrote ${T}/out/accept"; fi
 
 export STUB_DRC="${G}/drc_one_each.json" STUB_DRC_REFILLED="${G}/drc_clean.json" STUB_DRC_RC=5 STUB_ERC="${G}/erc_error.json"
 stub bash "${ERCDRC}" drc "${pcb2}" >/dev/null 2>&1; stub bash "${ERCDRC}" erc "${sch2}" >/dev/null 2>&1
@@ -373,6 +602,36 @@ has   "drc counts named"                   '^  drc: +BLOCKED: 1 error \(saved fi
 has   "erc error named"                    '^  erc: +BLOCKED: 1 error: '
 has   "pin diff current again"             '^  pin_diff: +pass: '
 if [[ ! -e "${T}/out/fail" ]]; then ok "nothing written"; else bad "failing export wrote ${T}/out/fail"; fi
+expect 0 "--accept waives failing counts on current inputs" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/accept"
+out="$(cat "${T}/out/accept/MANIFEST.txt" 2>&1)"
+has   "manifest: ACCEPTED with the reason" '^gates: +ACCEPTED - user accepted: selftest$'
+has   "manifest: --accept verbatim"        '^gate flags: +--accept "user accepted: selftest"$'
+has   "manifest: waived drc gate, counts"  '^  drc: +WAIVED \(accepted: "user accepted: selftest"\): 1 error \(saved fills\); 1 unconnected \(saved fills\); 1 parity \(saved fills\): saved fills violations=1 \(errors=1\) unconnected=1 parity=1'
+has   "manifest: waived erc gate, counts"  '^  erc: +WAIVED \(accepted: "user accepted: selftest"\): 1 error: errors=1 '
+has   "manifest: pin diff passes"          '^  pin_diff: +pass: '
+cp "${B2}/review/drc.json" "${B2}/review/drc_refilled.json" "${T}/"   # re-record the same reports, started
+fstart drc "${pcb2}" "${B2}/review"; cp "${T}/drc.json" "${T}/drc_refilled.json" "${B2}/review/"
+python3 "${FAB}" record drc "${pcb2}" "${B2}/review" --flags=--severity-all --rc 5,0 >/dev/null 2>&1
+expect 4 "--accept cannot waive DRC without parity" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/noparity"
+has   "named"                              '^--accept cannot waive: drc: run without --schematic-parity$'
+fstart drc "${pcb2}" "${B2}/review"; cp "${T}/drc.json" "${B2}/review/"   # no drc_refilled.json
+python3 "${FAB}" record drc "${pcb2}" "${B2}/review" --flags="--severity-all --schematic-parity --all-track-errors" --rc 5 >/dev/null 2>&1
+expect 4 "--accept cannot waive a missing refilled run" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/norefill"
+has   "named"                              '^--accept cannot waive: drc: refilled run missing$'
+cp "${B2}/review/gate.json" "${T}/gate.json.bak"; printf '[1]\n' > "${B2}/review/gate.json"
+expect 4 "--accept cannot waive an unreadable gate.json" fx --accept "user accepted: selftest" "${pcb2}" "${sch2}" "${T}/out/badgate"
+has   "named"                              '^--accept cannot waive: erc: gate.json unreadable: '
+cp "${T}/gate.json.bak" "${B2}/review/gate.json"
+if [[ ! -e "${T}/out/noparity" && ! -e "${T}/out/norefill" && ! -e "${T}/out/badgate" ]]; then ok "nothing written"; else bad "a refused --accept wrote a set"; fi
+
+pd "${B7}/review/board.net" "${T}/net/pins.h" --record "${B7}" >/dev/null 2>&1
+expect 4 "refused: critical rules downgraded" fx "${B7}/aquila-fc.kicad_pcb" "${B7}/aquila-fc.kicad_sch" "${T}/out/soft"
+has   "drc block named"                    '^  drc: +BLOCKED: critical rule below its floor: clearance=warning: '
+has   "erc block named"                    '^  erc: +BLOCKED: critical rule below its floor: pin_not_connected=warning: '
+expect 0 "--accept waives a downgraded critical rule" fx --accept "user accepted: soft clearance" "${B7}/aquila-fc.kicad_pcb" "${B7}/aquila-fc.kicad_sch" "${T}/out/soft"
+out="$(cat "${T}/out/soft/MANIFEST.txt" 2>&1)"
+has   "manifest: downgraded checks"        '^drc downgraded checks: clearance=warning \(default error, critical: blocks\), '
+has   "manifest: waived drc gate"          '^  drc: +WAIVED \(accepted: "user accepted: soft clearance"\): critical rule below its floor: clearance=warning: '
 
 B5="${T}/nopin/aquila-fc"; mkboard "${B5}"
 export STUB_DRC="${G}/drc_clean.json" STUB_DRC_REFILLED="${G}/drc_clean.json" STUB_DRC_RC=0 STUB_ERC="${G}/erc_warning.json"
@@ -381,10 +640,12 @@ expect 4 "refused: pin diff not run" fx "${B5}/aquila-fc.kicad_pcb" "${B5}/aquil
 has   "only the pin diff blocks"           '^  pin_diff: +BLOCKED: not run'
 lacks "erc and drc pass"                   '^  (erc|drc): +BLOCKED'
 expect 0 "--no-pin-header" fx --no-pin-header "${B5}/aquila-fc.kicad_pcb" "${B5}/aquila-fc.kicad_sch" "${T}/out/nopin"
+has   "gate output: not applicable by flag" '^gates: +pass \(pin diff not applicable: --no-pin-header\)$'
 out="$(cat "${T}/out/nopin/MANIFEST.txt" 2>&1)"
-has   "manifest: gates pass"               '^gates: +pass$'
+has   "manifest: not a plain pass"         '^gates: +pass \(pin diff not applicable: --no-pin-header\)$'
 has   "manifest: --no-pin-header verbatim" '^gate flags: +--no-pin-header$'
 has   "manifest: pin diff not applicable"  '^  pin_diff: +not applicable: --no-pin-header'
+has   "manifest review block agrees"       '^  pin_diff: +not applicable \(--no-pin-header\)$'
 export STUB_DRC=/nonexistent/drc.json
 expect 1 "drc wrote no report: gate entry removed" stub bash "${ERCDRC}" drc "${B5}/aquila-fc.kicad_pcb"
 has   "says not recorded"                  '^gate: drc not recorded '

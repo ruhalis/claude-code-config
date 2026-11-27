@@ -6,33 +6,43 @@
 # First the gates (scripts/fabset.py gate), before anything is plotted or <outdir> is created: from
 # <board>/review/gate.json, which erc_drc.sh and pin_diff.py --record write, ERC run, current and 0 errors (warnings
 # allowed); DRC run with --schematic-parity, current, 0 error-severity violations, 0 unconnected, 0 parity in both
-# the saved-fill and the refilled run; pin diff run, current, 0 errors. Current = every input still hashes as
-# recorded. A blocking gate: exit 4, each gate named with its reason (not run, stale: <file> changed,
-# 2 unconnected), nothing written.
-#   --no-pin-header      the project has no firmware pin header: the pin-diff gate does not apply
-#   --accept "<reason>"  export despite failing or stale gates (the user accepted the remaining items)
-# Both are written verbatim into MANIFEST.txt (`gates: ACCEPTED - <reason>`, `gate flags: ...`).
+# the saved-fill and the refilled run; pin diff run, current, 0 errors, on the netlist export_review.sh recorded
+# from the current sheets; no critical rule downgraded. The full definition is in SKILL.md (Gates).
+# Current = every input still hashes as recorded. A blocking gate: exit 4, each gate named with its reason
+# (not run, stale: <file> changed, 2 unconnected), nothing written.
+#   --no-pin-header      the project has no firmware pin header: the pin-diff gate does not apply. Refused
+#                        (exit 4) when review/gate.json holds a pin diff for this board.
+#   --accept "<reason>"  export despite failing counts or downgraded critical rules recorded on the current
+#                        inputs (the user accepted them). It cannot waive a gate that is not run, stale, run
+#                        without parity or without the refilled run, a stale netlist, an unreadable gate.json or
+#                        a refused --no-pin-header: those still exit 4.
+# Both are written verbatim into MANIFEST.txt (`gates: ACCEPTED - <reason>`, `gate flags: ...`, each waived gate
+# as `WAIVED` with its counts).
 #
-# Writes  <outdir>/gerber/*   gerbers (Protel extensions, zones refilled in memory) + Excellon drill + drill map;
-#                             the directory is emptied first, so no stale file reaches the zip
+# <outdir> must be new or hold no order file (gerber/, gerbers.zip, bom.csv, cpl.csv, MANIFEST.txt): exit 1
+# otherwise, use a new dated folder. The set is built in a temporary sibling directory and moved into <outdir> only
+# when every step and check passed; on any failure nothing is left behind.
+# Writes  <outdir>/gerber/*   gerbers (Protel extensions, zones refilled in memory) + Excellon drill + drill map
 #         <outdir>/gerbers.zip
 #         <outdir>/bom.csv    JLC columns: Comment, Designator, Footprint, LCSC Part #, plus Quantity and MPN;
 #                             designators comma-listed, never ranges
 #         <outdir>/cpl.csv    JLC columns: Designator, Val, Package, Mid X, Mid Y, Rotation, Layer
 #         <outdir>/MANIFEST.txt  sha256 of the board, every sheet of the hierarchy, .kicad_pro, .kicad_dru and the
 #                             uploads; kicad-cli version; git revision and dirty flag; the gate lines and flags; the
-#                             ERC and DRC disabled checks and exclusions; copper layers; drill tools with holes and
-#                             slots; ERC/DRC/pin_diff counts from <board>/review/ ("not run" when absent, "STALE"
-#                             when older than a file they depend on)
+#                             ERC and DRC disabled and downgraded checks and exclusions; copper layers; drill tools
+#                             with holes and slots; ERC/DRC/pin_diff counts from <board>/review/ ("not run" when
+#                             absent, "STALE" when older than a file they depend on)
 # then checks the set (scripts/fabset.py check) and prints counts for the pre-order checklist in
 # references/jlcpcb-order.md.
 #
 # Env: LCSC_FIELD (default LCSC) — the symbol field that holds the LCSC part number.
 #      MPN_FIELD  (default MPN)
-# Exit 4: a gate blocks (no --accept); nothing written. Exit 1 on any kicad-cli failure, on misuse, or on a failed
-# check: gerber/ is not exactly the files the job file lists plus drill, map and job file, one per requested layer;
-# a BOM cell holds a designator range; a BOM designator with an LCSC number has no CPL row. CPL-only designators
-# (fiducials, logos) are listed, not failed. MANIFEST.txt is written either way; after a failed check it says so.
+# Exit 4: a gate blocks (and --accept was not given or cannot waive it), before the export or when the manifest
+# recomputes the gates after it (an input changed during the export); nothing written. Exit 1 on any kicad-cli
+# failure, on misuse, on an <outdir> that holds order files, or on a failed check: gerber/ is not exactly the files
+# the job file lists plus drill, map and job file, one per requested layer; a BOM cell holds a designator range; a
+# BOM designator with an LCSC number has no CPL row. CPL-only designators (fiducials, logos) are listed, not failed.
+# Exit 1 leaves nothing in <outdir>; the check and manifest lines are printed.
 set -uo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -66,20 +76,39 @@ echo "== gates ($(dirname "${pcb}")/review/gate.json)"
 python3 -B "${SKILL_DIR}/scripts/fabset.py" gate --pcb "${pcb}" --sch "${sch}" ${gate_args[@]+"${gate_args[@]}"}
 grc=$?
 if [[ ${grc} -eq 4 ]]; then
-  echo "NOT EXPORTED: a gate blocks (lines above); nothing was written to ${out}. Re-run the blocking check, or pass --accept \"<reason>\" once the user has accepted the remaining items." >&2
+  echo "NOT EXPORTED: a gate blocks (lines above); nothing was written to ${out}. Re-run the blocking check; --accept \"<reason>\" waives only failing counts and downgraded critical rules the user has accepted, never a block marked [cannot be accepted]." >&2
   exit 4
 fi
 [[ ${grc} -eq 0 ]] || { echo "FAILED: gate check (exit ${grc})" >&2; exit 1; }
-# <outdir>/gerber is emptied before plotting, so refuse an outdir that could hold anything else: the board's own
-# directory, or a gerber/ with files that are not fab outputs.
-mkdir -p "${out}" || exit 1
-[[ "$(cd "$(dirname "${pcb}")" && pwd)" != "$(cd "${out}" && pwd)" ]] || { echo "outdir is the board's own directory; use <board>/fab/<date>" >&2; exit 1; }
-if [[ -d "${out}/gerber" ]] && find "${out}/gerber" -type f ! -name '*.g[a-z0-9]*' ! -name '*.drl' ! -name '*.pdf' | grep -q .; then
-  echo "${out}/gerber holds files that are not fab outputs; move them or use a fresh outdir" >&2; exit 1
+# Never over an earlier set: an outdir holding any order file is refused, and the board's own directory too
+# (physical paths, so a symlink to it counts).
+out="${out%/}"
+if [[ -d "${out}" ]]; then
+  [[ "$(cd "$(dirname "${pcb}")" && pwd -P)" != "$(cd "${out}" && pwd -P)" ]] || { echo "outdir is the board's own directory; use <board>/fab/<date>" >&2; exit 1; }
+  for f in gerber gerbers.zip bom.csv cpl.csv MANIFEST.txt; do
+    if [[ -e "${out}/${f}" ]]; then
+      echo "${out} already holds ${f} from an earlier export; never export over a set: use a new dated folder (fab/<date>b)" >&2; exit 1
+    fi
+  done
+elif [[ -e "${out}" ]]; then
+  echo "${out} exists and is not a directory" >&2; exit 1
 fi
-rm -rf "${out}/gerber" "${out}/MANIFEST.txt" && mkdir -p "${out}/gerber" || exit 1
+# Built in a temporary sibling directory, moved into place only when every step passed; removed on any failure.
+parent="$(dirname "${out}")"; top=""; d="${parent}"
+while [[ ! -d "${d}" ]]; do top="${d}"; d="$(dirname "${d}")"; done   # the highest directory this run creates
+mkdir -p "${parent}" || exit 1
+final="${out}"
+out="$(mktemp -d "${final}.partial.XXXXXX")" || exit 1
+cleanup() {
+  rm -rf "${out}"
+  d="${parent}"
+  while [[ -n "${top}" ]] && rmdir "${d}" 2>/dev/null && [[ "${d}" != "${top}" ]]; do d="$(dirname "${d}")"; done
+  return 0
+}
+trap cleanup EXIT
+mkdir -p "${out}/gerber" || exit 1
 
-fail() { echo "FAILED: $*" >&2; exit 1; }
+fail() { echo "FAILED: $*; nothing was written to ${final}" >&2; exit 1; }
 
 # Copper layer set from the board's (layers ...) header only, lines like `(4 "In1.Cu" power ["GND"])`: F.Cu, In1.Cu..,
 # B.Cu. Pad and zone layer lists elsewhere in the file can name In1..In30 on a 2-layer board, so they are not read.
@@ -134,9 +163,25 @@ echo "== checks and counts"
 python3 -B "${SKILL_DIR}/scripts/fabset.py" check "${out}" "$(basename "${pcb}" .kicad_pcb)" "${copper_count}"
 checks=$?
 
-# MANIFEST.txt ties this set to the files it came from; written after a failed check too, marked FAIL.
+# MANIFEST.txt ties this set to the files it came from; printed after a failed check too, marked FAIL.
 echo "== manifest"
 python3 -B "${SKILL_DIR}/scripts/fabset.py" manifest "${out}" --pcb "${pcb}" --sch "${sch}" \
   --kicad "$("${CLI}" version 2>/dev/null | head -n 1 | tr -d '[:space:]')" --copper "${copper}" \
-  --checks "$([[ ${checks} -eq 0 ]] && echo pass || echo FAIL)" ${gate_args[@]+"${gate_args[@]}"} || fail "manifest"
+  --checks "$([[ ${checks} -eq 0 ]] && echo pass || echo FAIL)" --fail-if-blocked ${gate_args[@]+"${gate_args[@]}"}
+mrc=$?
+if [[ ${mrc} -eq 4 ]]; then
+  echo "NOT EXPORTED: an input changed during the export, so a gate recomputed for the manifest blocks (lines above); the set was discarded and nothing was written to ${final}. Re-run the check it names, then export again." >&2
+  exit 4
+fi
+[[ ${mrc} -eq 0 ]] || fail "manifest"
 [[ ${checks} -eq 0 ]] || fail "file-set checks (FAIL lines above)"
+
+# Every step passed: the set moves into place.
+if [[ -d "${final}" ]]; then
+  for f in gerber gerbers.zip bom.csv cpl.csv MANIFEST.txt; do mv "${out}/${f}" "${final}/" || fail "move into ${final}"; done
+  rmdir "${out}" || fail "move into ${final}"
+else
+  mv "${out}" "${final}" || fail "move into ${final}"
+fi
+trap - EXIT
+echo "set: ${final}"

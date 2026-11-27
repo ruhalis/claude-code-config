@@ -3,7 +3,10 @@
 # project files (kicad-cli itself rewrites <project>.kicad_prl beside them).
 #
 #   export_review.sh sch <board_dir|project.kicad_pro>
-#     review/board.net            netlist, kicadsexpr (pin_diff.py reads it)
+#     review/board.net            netlist, kicadsexpr (pin_diff.py reads it). The old one is deleted first; the
+#                                 sheets are hashed before the export and the netlist's sha256 is recorded with
+#                                 them in review/gate.json (fabset.py netlist), which the pin-diff gate requires. A
+#                                 sheet that changes during the export: no netlist and no record, exit 1.
 #     review/bom.csv              review BOM: Reference, Value, Footprint, QUANTITY, LCSC, MPN, DNP; grouped by value,
 #                                 footprint and LCSC; designators listed, never ranges
 #     review/schematic.pdf        every sheet
@@ -27,6 +30,7 @@
 # or rasterisation failed.
 set -uo pipefail
 
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${KICAD_APP:-/Applications/KiCad/KiCad.app}"
 CLI="${APP}/Contents/MacOS/kicad-cli"
 LCSC_FIELD="${LCSC_FIELD:-LCSC}"
@@ -66,7 +70,15 @@ pdfs=""
 if [[ "${mode}" == sch ]]; then
   [[ -f "${sch}" ]] || { echo "no such file: ${sch}" >&2; exit 1; }
   echo "== netlist"
-  "${CLI}" sch export netlist --format kicadsexpr -o "${rev}/board.net" "${sch}" >/dev/null || fail "netlist export"
+  # The netlist is tied to the sheets it came from: hashed before the export, recorded with its sha256 after.
+  state="$(mktemp "${TMPDIR:-/tmp}/export_review.XXXXXX")" || exit 1
+  trap 'rm -f "${state}"' EXIT
+  rm -f "${rev}/board.net"
+  netlist() { python3 -B "${SKILL_DIR}/scripts/fabset.py" netlist "$1" "${sch}" "${state}"; }
+  netlist start || fail "netlist record (start)"
+  "${CLI}" sch export netlist --format kicadsexpr -o "${rev}/board.net" "${sch}" >/dev/null \
+    || { rm -f "${rev}/board.net"; fail "netlist export"; }
+  netlist finish || { rm -f "${rev}/board.net"; fail "netlist record: no netlist kept"; }
   echo "${rev}/board.net"
   echo "== review BOM"
   "${CLI}" sch export bom -o "${rev}/bom.csv" \

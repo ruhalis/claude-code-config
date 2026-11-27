@@ -14,10 +14,16 @@
 # (drc_refilled.json; never --save-board, the file is not written). Counts that differ mean the saved fills are stale.
 # DRC counts the three report arrays apart in both runs and prints them on one line per run:
 #   saved fills: violations=<n> (errors=<n>) unconnected=<n> parity=<n>
-# Both ERC and DRC print `disabled checks: <names or none>` and `exclusions: <n>` (scripts/fabset.py record).
+# Both ERC and DRC print `disabled checks: <names or none>`, `downgraded checks: <rule=severity ... or none>` and
+# `exclusions: <n>` (scripts/fabset.py record); a critical rule below its floor in the .kicad_pro blocks the gate.
+# The gate is recorded only for a completed run: fabset.py start before the first kicad-cli call (entry and old
+# reports removed, input hashes kept), fabset.py record after the last, which refuses when a kicad-cli exit is not
+# 0 or 5, an input changed during the run, or the report is missing or malformed. A refused record leaves no entry.
 # Exit codes are the first kicad-cli run's, passed through: 0 clean, 5 violations reported (any severity),
-# 3 the file failed to load; a 0 becomes 5 when either DRC run has an error-severity violation, an unconnected item
-# or a parity issue. 1 = misuse of this script, including a file of the wrong type, or no gate record written.
+# 3 the file failed to load (never recorded, even when a report was written); a 0 becomes 5 when either DRC run
+# has an error-severity violation, an unconnected item or a parity issue, or a critical rule is downgraded.
+# 1 = misuse of this script, including a file of the wrong type, or no gate record written after a completed
+# kicad-cli run (an input changed during the run, a report that is not a kicad-cli report on this file).
 set -uo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -46,8 +52,10 @@ esac
 [[ -n "${out}" ]] || out="$(dirname "${in}")/review"
 mkdir -p "${out}" || exit 1
 json="${out}/${mode}.json"
-rm -f "${json}"
 DRC_FLAGS="--severity-all --schematic-parity --all-track-errors"
+fabset() { python3 -B "${SKILL_DIR}/scripts/fabset.py" "$@"; }
+# Before kicad-cli: the gate entry and the old reports go, the input hashes are kept (fabset.py start).
+fabset start "${mode}" "${in}" "${out}" || { echo "gate start failed: nothing was checked" >&2; exit 1; }
 
 if [[ "${mode}" == erc ]]; then
   "${CLI}" sch erc --format json --severity-all --exit-code-violations -o "${json}" "${in}"
@@ -57,8 +65,11 @@ else
 fi
 rc=$?
 
+rcs="${rc}"
+
 flags="--severity-all"; [[ "${mode}" == drc ]] && flags="${DRC_FLAGS}"
-record() { python3 -B "${SKILL_DIR}/scripts/fabset.py" record "${mode}" "${in}" "${out}" --flags="${flags}"; }
+# After the last kicad-cli call: records only a completed run (every exit 0 or 5) on unchanged inputs.
+record() { fabset record "${mode}" "${in}" "${out}" --flags="${flags}" --rc="${rcs}"; }
 
 if [[ ! -s "${json}" ]]; then
   echo "kicad-cli exit ${rc}: no report written (load failure? see the lines above)"
@@ -70,9 +81,9 @@ fi
 refilled=""
 if [[ "${mode}" == drc ]]; then
   refilled="${out}/drc_refilled.json"
-  rm -f "${refilled}"
   # shellcheck disable=SC2086
   "${CLI}" pcb drc --format json ${DRC_FLAGS} --refill-zones -o "${refilled}" "${in}" >/dev/null
+  rcs="${rcs},$?"
 fi
 
 python3 - "${json}" "${mode}" "${refilled}" <<'PY'
@@ -154,7 +165,9 @@ record; grc=$?
 case "${grc}" in
   0) ;;
   5) [[ "${rc}" -ne 0 ]] || rc=5 ;;
-  *) echo "gate record failed (exit ${grc}): fab_export.sh will read this check as not run" >&2; exit 1 ;;
+  *) echo "gate record failed (exit ${grc}): its entry was removed, fab_export.sh will read this check as not run" >&2
+     [[ "${rc}" -ne 0 && "${rc}" -ne 5 ]] || rc=1   # kicad-cli's own failure (3: did not load) is kept
+     exit "${rc}" ;;
 esac
 review_default="$(cd "$(dirname "${in}")" && pwd)/review"
 [[ "$(cd "${out}" && pwd)" == "${review_default}" ]] || echo "note: outdir is not ${review_default}; fab_export.sh reads the gate only from there"
