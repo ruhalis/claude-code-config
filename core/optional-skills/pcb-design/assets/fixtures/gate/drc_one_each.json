@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schemas.kicad.org/drc.v1.json",
+  "coordinate_units": "mm",
+  "date": "2026-11-27T01:36:26",
+  "ignored_checks": [
+    {
+      "description": "Footprint has no courtyard defined",
+      "key": "missing_courtyard"
+    },
+    {
+      "description": "Track endpoint not centered on via",
+      "key": "track_not_centered_on_via"
+    }
+  ],
+  "included_severities": [
+    "error",
+    "warning",
+    "exclusion"
+  ],
+  "kicad_version": "10.0.5",
+  "schematic_parity": [
+    {
+      "description": "Missing footprint J9",
+      "items": [
+        {
+          "description": "Symbol J9 [Conn_01x02]",
+          "pos": {
+            "x": 0,
+            "y": 0
+          },
+          "uuid": "00000000-0000-0000-0000-000000000005"
+        }
+      ],
+      "severity": "warning",
+      "type": "missing_footprint"
+    }
+  ],
+  "source": "aquila-fc.kicad_pcb",
+  "unconnected_items": [
+    {
+      "description": "Missing connection between items",
+      "items": [
+        {
+          "description": "Pad 2 [I2C_SDA] of U1 on F.Cu",
+          "pos": {
+            "x": 22.0,
+            "y": 6.75
+          },
+          "uuid": "00000000-0000-0000-0000-000000000003"
+        },
+        {
+          "description": "Pad 1 [I2C_SDA] of R4 on F.Cu",
+          "pos": {
+            "x": 30.0,
+            "y": 8.0
+          },
+          "uuid": "00000000-0000-0000-0000-000000000004"
+        }
+      ],
+      "severity": "error",
+      "type": "unconnected_items"
+    }
+  ],
+  "violations": [
+    {
+      "description": "Clearance violation (netclass 'Default' clearance 0.2000 mm; actual 0.1500 mm)",
+      "items": [
+        {
+          "description": "Track [GND] on F.Cu, length 2.0000 mm",
+          "pos": {
+            "x": 10.0,
+            "y": 12.5
+          },
+          "uuid": "00000000-0000-0000-0000-000000000001"
+        },
+        {
+          "description": "Pad 1 [VCC] of C3 on F.Cu",
+          "pos": {
+            "x": 10.15,
+            "y": 12.5
+          },
+          "uuid": "00000000-0000-0000-0000-000000000002"
+        }
+      ],
+      "severity": "error",
+      "type": "clearance"
+    }
+  ]
+}

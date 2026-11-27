@@ -1,0 +1,8 @@
+(version 1)
+
+(rule "Board edge clearance"
+  (constraint edge_clearance (min 0.3mm)))
+(rule "Silenced rule"
+  (condition "A.NetClass == 'RF_50'")
+  (constraint clearance (min 0.65mm))
+  (severity ignore))

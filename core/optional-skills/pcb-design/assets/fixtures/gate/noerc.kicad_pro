@@ -1,0 +1,14 @@
+{
+  "board": {
+    "design_settings": {
+      "drc_exclusions": [],
+      "rule_severities": {
+        "missing_courtyard": "ignore"
+      }
+    }
+  },
+  "meta": {
+    "filename": "noerc.kicad_pro",
+    "version": 3
+  }
+}

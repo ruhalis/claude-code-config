@@ -29,7 +29,7 @@ core/                  source of truth: agents and skills
   skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
   skills/deep-research/  gitignored local copy (see below)
   skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code: uses Agent and Artifact)
-  optional-skills/*/     skills linked only into the projects that use them: isaac, led-animation, motor-bench
+  optional-skills/*/     skills linked only into the projects that use them: isaac, led-animation, motor-bench, pcb-design
   optional-skills/projects.txt   which project directories each optional skill is linked into
 adapters/
   claude/                CLAUDE.md + output-styles/ + statusline.sh + settings.json + keybindings.json + hooks/ + mods/ + bin/clangd
@@ -108,6 +108,7 @@ The skills hold workflow and boundaries; project facts live in the project, in `
 |---|---|---|
 | `## Boards` | esp-idf | `<board name>: <serial port>` |
 | `## Motors` (optional) | motor-bench | what moves and its power, the interface and sending tool, how to recognise the program, the stop command and its confirmation, limits, user-only commands, the physical kill; without the section motor-bench asks and offers a draft |
+| `## Hardware` | pcb-design | `kicad:` (the `.kicad_pro`), `pins:` (firmware pin header), `mcu:` (its reference designator), `fab:`, `note:` (the design note) |
 | `## Experiments` | rl-advisor | `log:`, `run-id:`, `runs:`, `metric:`, `eval:`, `framework:` |
 
 Keep `## Boards` short and first: esp-idf reads a fixed 12 lines after its heading. A flash or reset of a board wired to ESCs or drivers follows motor-bench as well as esp-idf. led-animation reads the free-form `CLAUDE.md` section on the renderer and the host tooling's README instead; isaac reads the project's `CLAUDE.md` first, which wins over its own version table. rl-advisor keeps a run's record where the project keeps it: a ledger for the moving state and a digest for the durable facts, found through `## Experiments` or a grep, else an entry in the template of `references/isaac-lab-log.md`.
@@ -155,8 +156,7 @@ The rule is enforced, not only stated: `adapters/claude/hooks/guard-main-session
 
 `adapters/claude/hooks/guard-git-write.sh` (`PreToolUse` on `Bash`, `onFailure: block`, every agent) backs the never-commit rule. The `permissions.deny` patterns match the command text, so `git -C dir commit` or `git -c k=v push` slip past them; the hook finds the real subcommand behind git's global options, env prefixes, wrappers, chains, `$(...)` and `bash -c`, and denies `commit`, `push`, `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, the sweeping `git add` forms and `gh pr create`. It does not see git aliases, `eval`, or history writers the rule doesn't name (`pull`, `am`, `update-ref`).
 
-These are the only two hooks. Nothing guards KiCad or Zener board files now: the PCB tooling (the `kicad-review`, `pcb-author` and `pcb-enclosure` skills, the KiCad guard hook and the `kicad-happy` plugin) was removed on 2026-11-27, to be rebuilt later.
-
+These are the only two hooks. No hook guards KiCad or Zener board files: the earlier PCB tooling (the `kicad-review`, `pcb-author` and `pcb-enclosure` skills, the KiCad guard hook and the `kicad-happy` plugin) was removed on 2026-11-27 and rebuilt the same day as one optional skill, `pcb-design`, linked into aquila. Its protection is at the output instead of the edit: `fab_export.sh` refuses to produce an order set while ERC, DRC with schematic parity or the firmware pin diff is failing, stale or not run.
 Delegation is mandatory for validation because batch output is noise in the main thread: a session that runs its own batches buries the task under it and loses the thread, and that costs more than the extra tokens the agents spend. The specialists have no `Skill` tool, so a skill that covers delegated work hands them its rules instead: esp-idf through its "When delegating" block, isaac through `delegate.md`. Hardware actions (flashing, resets, motors) stay with the main session.
 
 `settings.json` also turns on Claude Code's advisor tool with `advisorModel: fable`. The advisor reads only the transcript and re-reads all of it uncached on each call, so the output style keeps the main session's use to three moments: before committing to the plan for a large or risky change, when the same error returns after two attempts, and before handing over a written deliverable; a code milestone gets a verifier run instead. No subagent calls it: CLAUDE.md says so to every agent, each agent file carries the line, and `bench.sh` fails if one stops doing so. A Fable 5.2 main session accepts only Fable 5.2 as its advisor (Claude Code 2.1.321 or later), which is why the setting is `fable`: with `opus` a Fable session starts with no advisor and says so at launch. `/advisor` writes to the home settings copy, which the next `install.sh` run overwrites.

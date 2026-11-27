@@ -4,3 +4,4 @@
 isaac          ~/projects/aquila ~/projects/berkley
 led-animation  ~/projects/renee
 motor-bench    ~/projects/aquila
+pcb-design     ~/projects/aquila

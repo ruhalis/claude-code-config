@@ -1,0 +1,40 @@
+{
+  "board": {
+    "design_settings": {
+      "drc_exclusions": [
+        [
+          "clearance|10000000|12500000|00000000-0000-0000-0000-000000000001|",
+          ""
+        ]
+      ],
+      "rule_severities": {
+        "clearance": "error",
+        "missing_courtyard": "ignore",
+        "silk_overlap": "ignore",
+        "track_not_centered_on_via": "ignore",
+        "unconnected_items": "error"
+      }
+    }
+  },
+  "erc": {
+    "erc_exclusions": [
+      [
+        "pin_not_connected|1000000|2000000|00000000-0000-0000-0000-000000000006||",
+        ""
+      ],
+      [
+        "power_pin_not_driven|1000000|2000000|00000000-0000-0000-0000-000000000007||",
+        ""
+      ]
+    ],
+    "rule_severities": {
+      "four_way_junction": "ignore",
+      "pin_not_connected": "error",
+      "single_global_label": "ignore"
+    }
+  },
+  "meta": {
+    "filename": "aquila-fc.kicad_pro",
+    "version": 3
+  }
+}

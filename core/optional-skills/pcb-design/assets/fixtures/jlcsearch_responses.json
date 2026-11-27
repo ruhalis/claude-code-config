@@ -1,0 +1,130 @@
+{
+  "_note": "jlcsearch /api/search?q=C<n>&limit=10 bodies. C14663 and C2913202 as returned on 2026-11-27 (stock null: no recent check). C15849 and C2913203 are C14663/C2913202 with stock set by hand to a number and to 0. C1 is a real empty answer; C2 a response in a shape the script does not know. C45783, C15850 and C8678 (the fixture BOM's parts) are stand-in rows with made-up stock.",
+  "C14663": {
+    "components": [
+      {
+        "lcsc": 14663,
+        "mfr": "CC0603KRX7R9BB104",
+        "package": "0603",
+        "description": "100nF 50V X7R ±10% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+        "is_basic": true,
+        "is_preferred": false,
+        "stock": null,
+        "price": 0.0083,
+        "stock_checked_at": "2026-11-03T22:33:06.000Z"
+      }
+    ]
+  },
+  "C2913202": {
+    "components": [
+      {
+        "lcsc": 2913202,
+        "mfr": "ESP32-S3-WROOM-1-N16R8",
+        "package": "SMD,25.5x18mm",
+        "description": "-103.5dBm -40℃~+65℃ 2.4GHz 20.5dBm 355mA 3V~3.6V 95mA ESP32-S3R8 On-board PCB Antenna UART、SPI、I2C、GPIO、I2S、USB SMD,25.5x18mm WiFi Modules ROHS",
+        "is_basic": false,
+        "is_preferred": false,
+        "stock": null,
+        "price": 5.3488,
+        "stock_checked_at": "2026-11-10T03:34:26.000Z"
+      }
+    ]
+  },
+  "C15849": {
+    "components": [
+      {
+        "lcsc": 15849,
+        "mfr": "CL10A105KB8NNNC",
+        "package": "0603",
+        "description": "100nF 50V X7R ±10% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+        "is_basic": true,
+        "is_preferred": false,
+        "stock": 1834410,
+        "price": 0.0083,
+        "stock_checked_at": "2026-11-27T01:23:00.000Z",
+        "is_standard_only": false
+      }
+    ]
+  },
+  "C2913203": {
+    "components": [
+      {
+        "lcsc": 2913203,
+        "mfr": "ESP32-S3-WROOM-1-N16R8",
+        "package": "SMD,25.5x18mm",
+        "description": "-103.5dBm -40℃~+65℃ 2.4GHz 20.5dBm 355mA 3V~3.6V 95mA ESP32-S3R8 On-board PCB Antenna UART、SPI、I2C、GPIO、I2S、USB SMD,25.5x18mm WiFi Modules ROHS",
+        "is_basic": false,
+        "is_preferred": false,
+        "stock": 0,
+        "price": 5.3488,
+        "stock_checked_at": "2026-11-27T01:23:00.000Z",
+        "is_standard_only": true
+      }
+    ]
+  },
+  "C1": {
+    "components": []
+  },
+  "C2": {
+    "results": [
+      {
+        "lcsc": 2
+      }
+    ]
+  },
+  "C3": {
+    "components": [
+      {
+        "lcsc": 3,
+        "mfr": "X",
+        "description": "no tier fields",
+        "stock": 10
+      }
+    ]
+  },
+  "C45783": {
+    "components": [
+      {
+        "lcsc": 45783,
+        "mfr": "CL21A226MAQNNNE",
+        "package": "0603",
+        "description": "stand-in row for the fixture BOM",
+        "is_basic": true,
+        "is_preferred": false,
+        "stock": 52000,
+        "price": 0.0083,
+        "stock_checked_at": "2026-11-27T01:23:00.000Z"
+      }
+    ]
+  },
+  "C15850": {
+    "components": [
+      {
+        "lcsc": 15850,
+        "mfr": "CL21A106KAYNNNE",
+        "package": "0603",
+        "description": "stand-in row for the fixture BOM",
+        "is_basic": true,
+        "is_preferred": false,
+        "stock": 3100000,
+        "price": 0.0083,
+        "stock_checked_at": "2026-11-27T01:23:00.000Z"
+      }
+    ]
+  },
+  "C8678": {
+    "components": [
+      {
+        "lcsc": 8678,
+        "mfr": "SY8089AAAC",
+        "package": "0603",
+        "description": "stand-in row for the fixture BOM",
+        "is_basic": false,
+        "is_preferred": false,
+        "stock": 41000,
+        "price": 0.0083,
+        "stock_checked_at": "2026-11-27T01:23:00.000Z"
+      }
+    ]
+  }
+}
