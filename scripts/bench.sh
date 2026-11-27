@@ -15,7 +15,7 @@
 #                               test a copy this way first, then copy it over.
 #
 # Static: symlinks point into this repo (optional skills into the projects
-# projects.txt names), live settings carry the hooks, the output style, the deny
+# projects.txt names, and nowhere else), live settings carry the hooks, the output style, the deny
 # list, the cache TTL and the subagent env and none of the removed plugins; every
 # hook command exists; the status line is local-only; agent frontmatter pins the
 # models and effort the docs say are valid and no agent may call the advisor; the
@@ -107,6 +107,38 @@ for d in "$REPO_DIR"/core/optional-skills/*/; do
     check "optional skill $n is named in projects.txt" bash -c "case '$mapped' in *' $n '*) exit 0;; esac; exit 1"
     check "optional skill $n is not linked globally" bash -c "! [ -e '$CLAUDE_DIR/skills/$n' ] && ! [ -L '$CLAUDE_DIR/skills/$n' ]"
 done
+# no optional-skill link the map does not name: the scan install.sh's
+# prune_optional_skills runs (every mapped project and the directories beside it)
+physdir() { (cd "$1" 2>/dev/null && pwd -P); }
+unmapped_optional_links() {
+    local keep=$'\n' seen=$'\n' cands="" name dirs p d c e n
+    while read -r name dirs; do
+        case "$name" in ''|'#'*) continue ;; esac
+        for p in $dirs; do
+            p="${p/#\~/$HOME}"
+            if [ -d "$p" ]; then keep+="$name"$'\t'"$(physdir "$p")"$'\n'; fi
+            for d in "$p" "$(dirname "$p")"/*/; do
+                [ -d "$d" ] || continue
+                c=$(physdir "$d") || continue
+                case "$seen" in *$'\n'"$c"$'\n'*) continue ;; esac
+                seen+="$c"$'\n'; cands+="$c"$'\n'
+            done
+        done
+    done < <([ -f "$MAP" ] && cat "$MAP")
+    while IFS= read -r c; do
+        [ -n "$c" ] || continue
+        for e in "$c"/.claude/skills/* "$c"/.claude/skills/.[!.]*; do
+            [ -L "$e" ] || continue
+            case "$(readlink "$e")" in "$REPO_DIR"/core/optional-skills/*) ;; *) continue ;; esac
+            n="${e##*/}"
+            case "$keep" in *$'\n'"$n"$'\t'"$c"$'\n'*) continue ;; esac
+            printf '%s ' "$e"
+        done
+    done <<< "$cands"
+}
+stale=$(unmapped_optional_links)
+if [ -z "$stale" ]; then ok "no optional-skill link that projects.txt does not name"
+else bad "no optional-skill link that projects.txt does not name (install.sh removes them)" "unmapped: ${stale% }"; fi
 check "~/.claude/hooks/guard-main-session.sh -> adapters/claude/hooks" linked_to "$CLAUDE_DIR/hooks/guard-main-session.sh" "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook is executable" test -x "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"
 check "guard hook passes bash -n" bash -n "$REPO_DIR/adapters/claude/hooks/guard-main-session.sh"

@@ -4,7 +4,7 @@ These apply to the main session and to every subagent. The main session's own ru
 
 ## Git
 
-The user reviews and makes every commit, so don't commit or push, even when asked to: no `git commit`, `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`, and no script that runs them. A hook and deny rules block them. Two side effects: list tags with `git for-each-ref refs/tags`, and when `git -C <dir> ...` is denied for containing the word commit or push, run the command from inside the repo. Read-only git is fine. Throwaway repos that a test creates in a temp directory are exempt.
+The user reviews and makes every commit, so don't commit or push, even when asked to: no `git commit`, `merge`, `rebase`, `cherry-pick`, `revert`, `tag`, `push` or `gh pr create`, and no script that runs them. Anatomy's `publish.mjs --submit` is such a script, and the hook can't see inside it: run it without `--submit`, which prints the commands for the user. A hook and deny rules block them. Two side effects: list tags with `git for-each-ref refs/tags`, and when `git -C <dir> ...` is denied for containing the word commit or push, run the command from inside the repo. Read-only git is fine. Throwaway repos that a test creates in a temp directory are exempt.
 
 When a change is ready, stage its files with explicit paths (`git add -A`, `.` and `-u` pick up scratch files and secrets), check `git diff --cached --stat`, and end with the commit as a command the user can run with `!`, with the attribution lines Claude Code supplies for commits:
 

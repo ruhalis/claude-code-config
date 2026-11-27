@@ -336,7 +336,10 @@ def check_skill(skill, root):
 
 # group 1: what comes before .claude/skills/ on the same path (empty for a relative path)
 REF_RE = re.compile(r"((?:[^\s`'\"()\[\]<>|,;]*/)?)\.claude/skills/([\w.-]+)((?:/[\w.@+-]*)*)")
-HOME_RE = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/Users/[^/]+|/home/[^/]+)/")
+# a home form ending the prefix, after whatever stands in front of it: SCRIPT=~/, --x=$HOME/, **~/, $PATH:~/
+HOME_RE = re.compile(r"(?:(?:^|(?<=[^\w./~-]))(?:~|/Users/[^/]+|/home/[^/]+)|\$HOME|\$\{HOME\})/$")
+# a project path ending the prefix, absolute or from home: ~/p/, $HOME/p/, ${HOME}/p/, /Users/me/p/, --x=~/p/
+PROJ_RE = re.compile(r"(?:^|(?<=[^\w./~-]))((?:~|\$HOME|\$\{HOME\})?/.+)$")
 PRUNE = {".git", "node_modules", ".venv", "venv", "__pycache__", "build", "managed_components"}
 PRUNE_PATHS = {REPO / "reports", REPO / "research_notes"}  # dated notes, not live references
 
@@ -375,7 +378,7 @@ def scan_refs(root, names, optional):
                     if name.startswith(".") or name == "synced":
                         continue
                     at = f"{tilde(p)}:{n} {ref}"
-                    if HOME_RE.fullmatch(prefix):  # the global skills folder
+                    if HOME_RE.search(prefix):  # the global skills folder
                         if name in optional:
                             bad.append(f"{at}: {name} is an optional skill now, in core/optional-skills/{name}, "
                                        f"reached as <project>/.claude/skills/{name}/ in {where(name)} (projects.txt)")
@@ -388,8 +391,9 @@ def scan_refs(root, names, optional):
                         # the project: the path's own prefix, else the top folder of the file under the
                         # scan root; unknown for a shell expression such as $(git rev-parse ...)/.
                         # This repo's files describe the layout and name no project.
-                        proj = (Path(os.path.expanduser(prefix.rstrip("/"))) if re.match(r"[~/].", prefix)
-                                else root / p.relative_to(root).parts[0] if not prefix else None)
+                        pm = PROJ_RE.search(prefix)
+                        proj = (Path(os.path.expanduser(re.sub(r"^\$(?:HOME|\{HOME\})(?=/)", "~", pm.group(1)).rstrip("/")))
+                                if pm else root / p.relative_to(root).parts[0] if not prefix else None)
                         if (proj and proj.is_dir() and proj.resolve() != REPO.resolve()
                                 and proj.resolve() not in {d.resolve() for d in linked.get(name, []) if d.is_dir()}):
                             bad.append(f"{at}: projects.txt does not link {name} into {tilde(proj)} (only {where(name)})")

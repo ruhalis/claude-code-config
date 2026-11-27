@@ -254,9 +254,61 @@ link_optional_skills() {
             case "$excl" in /*) ;; *) excl="$p/$excl" ;; esac
             grep -Fxq ".claude/skills/$name" "$excl" 2>/dev/null && continue
             say "exclude .claude/skills/$name in $excl"
-            [ "$DRY_RUN" = 1 ] || { mkdir -p "$(dirname "$excl")"; printf '%s\n' ".claude/skills/$name" >> "$excl"; }
+            [ "$DRY_RUN" = 1 ] || {
+                mkdir -p "$(dirname "$excl")"
+                # a last line without its newline would be glued to the pattern
+                if [ -s "$excl" ] && [ -n "$(tail -c 1 "$excl")" ]; then printf '\n' >> "$excl"; fi
+                printf '%s\n' ".claude/skills/$name" >> "$excl"
+            }
         done
     done < "$map"
+    prune_optional_skills
+}
+
+physdir() { (cd "$1" 2>/dev/null && pwd -P); }  # physdir <dir> — its path with links resolved
+
+# prune_optional_skills — remove the optional-skill links projects.txt does not
+# name: a skill taken off a project's line, a skill deleted from
+# core/optional-skills (its link dangles), a project dropped from the map. A
+# dropped project is named nowhere, so the scan covers every project the map
+# names and the other directories beside it (its parent's children, one level).
+# Only a symlink into core/optional-skills/ is removed; a real directory, a file
+# or a link elsewhere is the project's own. Its exact line in the project's git
+# exclude file goes with it. scripts/bench.sh runs the same scan.
+prune_optional_skills() {
+    local map="$REPO_DIR/core/optional-skills/projects.txt" name dirs p d c e t n excl
+    local keep=$'\n' seen=$'\n' cands=""
+    [ -f "$map" ] || return 0
+    while read -r name dirs; do
+        case "$name" in ''|'#'*) continue ;; esac
+        for p in $dirs; do
+            p="${p/#\~/$HOME}"
+            if [ -d "$p" ]; then keep+="$name"$'\t'"$(physdir "$p")"$'\n'; fi
+            for d in "$p" "$(dirname "$p")"/*/; do
+                [ -d "$d" ] || continue
+                c=$(physdir "$d") || continue
+                case "$seen" in *$'\n'"$c"$'\n'*) continue ;; esac
+                seen+="$c"$'\n'; cands+="$c"$'\n'
+            done
+        done
+    done < "$map"
+    while IFS= read -r c; do
+        [ -n "$c" ] || continue
+        for e in "$c"/.claude/skills/* "$c"/.claude/skills/.[!.]*; do
+            [ -L "$e" ] || continue
+            t=$(readlink "$e")
+            case "$t" in "$REPO_DIR"/core/optional-skills/*) ;; *) continue ;; esac
+            n="${e##*/}"
+            case "$keep" in *$'\n'"$n"$'\t'"$c"$'\n'*) continue ;; esac
+            say "link $(printf '%-7s' remove) $e -> ${t#"$REPO_DIR"/} ($([ -e "$e" ] && echo "not in projects.txt" || echo "dangling"))"
+            [ "$DRY_RUN" = 1 ] || rm "$e"
+            excl=$(git -C "$c" rev-parse --git-path info/exclude 2>/dev/null) || continue
+            case "$excl" in /*) ;; *) excl="$c/$excl" ;; esac
+            grep -Fxq ".claude/skills/$n" "$excl" 2>/dev/null || continue
+            say "unexclude .claude/skills/$n in $excl"
+            [ "$DRY_RUN" = 1 ] || { awk -v l=".claude/skills/$n" '$0 != l' "$excl" > "$excl.tmp" && mv "$excl.tmp" "$excl"; }
+        done
+    done <<< "$cands"
 }
 
 install_skills() {

@@ -18,6 +18,7 @@ the web and in your training data is 2.x and wrong here.
   `omni.*`, `isaacsim.*` and `carb` imports go inside that block (they exist only with Kit).
 - The physics backend is a `PresetCfg` in `SimulationCfg(physics=...)`, picked with `physics=<name>`.
 - Actuator limits: `joint_effort_limit` / `joint_velocity_limit`, not `effort_limit_sim` / `velocity_limit_sim`.
+- Every Cfg class carries `@configclass`. Without it a subclass's overrides silently revert to the parent defaults.
 - PPO cfg: `actor`/`critic` `RslRlMLPModelCfg`, not `policy=RslRlPpoActorCriticCfg`.
 - Task packages only `gym.register` lazy strings and stay importable without Isaac Lab; the CLI finds them
   through the `isaaclab.tasks` entry point.

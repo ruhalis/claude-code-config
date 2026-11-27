@@ -126,6 +126,9 @@ Use python3 3.12 or newer. Exit 0 clean, 1 findings (`path:line: ISCnnn message`
 5. **Reading state from USD.** Mid-simulation the stage does not track physics (PhysX writes to Fabric, Newton keeps state on the GPU). Read poses from asset data (`robot.data.root_pos_w.torch`).
 6. **Removed helpers.** `hydra_task_config` is gone (`resolve_task_config` / `parse_env_cfg`); `SimulationCfg.physx` is `SimulationCfg.physics`; per-library `scripts/reinforcement_learning/<lib>/train.py` is gone.
 7. **Process exit with Kit.** `launch_simulation` closes Kit when the `with` block ends, and Kit's fast shutdown can end the process right there (a 120 s watchdog force-exits a stuck teardown). Write files inside the block.
+8. **`@configclass` missing.** Without the decorator a Cfg subclass's overrides silently revert to the parent defaults. Decorate every Cfg class.
+9. **`DirectRLEnv` reward shaped `(num_envs, 1)`.** The RL wrappers expect `(num_envs,)`: squeeze the last dim.
+10. **Prim path without a leading `/`.** `World/Robot` silently finds nothing; write `/World/Robot`.
 
 ## Live Kit (script a running sim)
 
