@@ -1,3 +1,6 @@
 [submodule "core/skills/anatomy"]
 	path = core/skills/anatomy
 	url = https://github.com/wheresryan22/anatomy.git
+[submodule "core/vendor/emilkowalski-skills"]
+	path = core/vendor/emilkowalski-skills
+	url = https://github.com/emilkowalski/skills.git

@@ -10,7 +10,8 @@
 #
 # A skill FAILs on:
 #   - frontmatter outside the Agent Skills spec: a key other than name, description,
-#     license, compatibility, metadata, allowed-tools; a name that is not
+#     license, compatibility, metadata, allowed-tools (and Claude Code's
+#     disable-model-invocation); a name that is not
 #     ^[a-z0-9]+(-[a-z0-9]+)*$, is over 64 chars or is not the directory name; a
 #     description that is empty, over 1024 chars, or holds < or > (skill-creator's
 #     packager rejects those); compatibility over 500 chars; a metadata value that
@@ -56,6 +57,8 @@ SKILLS = REPO / "core" / "skills"
 OPTIONAL = REPO / "core" / "optional-skills"
 HOME = Path.home()
 SPEC_KEYS = ["name", "description", "license", "compatibility", "metadata", "allowed-tools"]
+# Claude Code's own keys, allowed because these skills are for Claude Code only.
+CLAUDE_KEYS = ["disable-model-invocation"]
 NAME_RE = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 NOT_PACKAGED = {"__pycache__", "node_modules"}
 
@@ -186,8 +189,8 @@ def check_frontmatter(skill, text, fail):
         fail(f"frontmatter: {e}")
         return
     for key in fm:
-        if key not in SPEC_KEYS:
-            fail(f"frontmatter: {key} is not a spec key (allowed: {', '.join(SPEC_KEYS)})")
+        if key not in SPEC_KEYS + CLAUDE_KEYS:
+            fail(f"frontmatter: {key} is not a spec key (allowed: {', '.join(SPEC_KEYS + CLAUDE_KEYS)})")
     for key in ("name", "description"):
         if key not in fm:
             fail(f"frontmatter: no {key}")

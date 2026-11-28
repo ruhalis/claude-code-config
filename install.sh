@@ -580,7 +580,7 @@ esac
 printf '%sInstalling from %s%s\n' "$B" "$REPO_DIR" "$RST"
 [ "$DRY_RUN" = 1 ] && printf '%s(dry run — nothing will be written)%s\n' "$YEL" "$RST"
 
-# The one submodule is the upstream anatomy skill.
+# The submodules are the upstream anatomy skill and emilkowalski/skills.
 case " ${TOOLS[*]} " in
     *" claude "*)
         if [ -f "$REPO_DIR/.gitmodules" ] && [ "$DRY_RUN" = 0 ]; then

@@ -20,11 +20,13 @@
     "document-skills@anthropic-agent-skills": true,
     "engineering@knowledge-work-plugins": true,
     "frontend-design@claude-plugins-official": true,
+    "impeccable@impeccable": true,
     "nvidia-skills@claude-plugins-official": true,
     "pdf-viewer@knowledge-work-plugins": true,
     "pyright-lsp@claude-plugins-official": true,
     "session-report@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
+    "taste-skill@taste-skill": true,
     "text-to-cad@earthtojake": true
   },
   "extraKnownMarketplaces": {
@@ -54,6 +56,20 @@
         "source": "github",
         "repo": "cloudflare/skills",
         "ref": "cbf893b954222276bf1af57e5f23379231e0efb9"
+      }
+    },
+    "impeccable": {
+      "source": {
+        "source": "github",
+        "repo": "pbakaus/impeccable",
+        "ref": "2fc5e1459efbbf06d92c7306517c286bf12490cf"
+      }
+    },
+    "taste-skill": {
+      "source": {
+        "source": "github",
+        "repo": "Leonxlnx/taste-skill",
+        "ref": "952435f63acece7d2fcb4b4d3c1786c1c43603e0"
       }
     }
   },
