@@ -95,7 +95,7 @@ copy() {  # copy <src> <dst>
 # Retired keys are deleted last: the merge alone would keep a key the repo no
 # longer declares. subagentStatusLine is deprecated in favour of mods (agent-rows);
 # the plugins and marketplaces listed were removed from the setup on 2026-11-27.
-JQ_SETTINGS='((.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))) | del(.subagentStatusLine, .enabledPlugins["kicad-happy@kicad-happy"], .enabledPlugins["desktop-commander@claude-plugins-official"], .enabledPlugins["rea@rea"], .extraKnownMarketplaces["kicad-happy"], .extraKnownMarketplaces["rea"])'
+JQ_SETTINGS='((.[0] * .[1]) + (.[0] | with_entries(select(.key | IN("model","modelSettings","effortLevel","autoMode"))))) | del(.subagentStatusLine, .enabledPlugins["kicad-happy@kicad-happy"], .enabledPlugins["rea@rea"], .extraKnownMarketplaces["kicad-happy"], .extraKnownMarketplaces["rea"])'
 # Keybindings: per context, live blocks then repo blocks, repo winning per key.
 JQ_KEYBINDINGS='(.[0] * .[1]) + {bindings: ((((.[0].bindings // []) + (.[1].bindings // [])) | group_by(.context)) | map({context: .[0].context, bindings: (map(.bindings) | add)}))}'
 # VS Code settings: repo wins on the keys it declares; every live-only key survives.

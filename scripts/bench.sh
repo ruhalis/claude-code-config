@@ -34,7 +34,7 @@
 #   L8  model routing, from modelUsage of a haiku main session:
 #       general-purpose + fast-executor -> a sonnet model, deep-reasoner -> opus
 #   L9  the orchestrator output style reaches the main session (it names the
-#       connector launcher and the agent that runs tests)
+#       plugin whose tools the guard hooks don't see and the agent that runs tests)
 # A logging hook (PreToolUse + SubagentStart) records every call with agent_id
 # and agent_type into hook-input.log so each verdict has evidence.
 #
@@ -184,10 +184,12 @@ for f in "$REPO_S" "$LIVE_S"; do
         jq -e '.permissions.deny as $d | ["Bash(git merge *)","Bash(git rebase *)","Bash(git cherry-pick *)","Bash(git revert *)","Bash(git tag *)","Bash(git add -A *)","Bash(git add --all *)","Bash(git add -u *)","Bash(git add --update *)","Bash(git add .)","Bash(git add . *)"] | all(. as $r | $d | index($r) != null)' "$f"
     check "$tag: permissions.deny keeps text-to-cad's pcb skill out" jq -e '.permissions.deny | index("Skill(text-to-cad:pcb)") != null' "$f"
     check "$tag: permissions.deny removes the built-in Explore agent" jq -e '.permissions.deny | index("Agent(Explore)") != null' "$f"
-    check "$tag: no kicad-happy, desktop-commander or rea plugin or marketplace" \
-        jq -e '([(.enabledPlugins // {}) | keys[] | split("@")[0]] + ((.extraKnownMarketplaces // {}) | keys)) | any(IN("kicad-happy","desktop-commander","rea")) | not' "$f"
+    check "$tag: no kicad-happy or rea plugin or marketplace" \
+        jq -e '([(.enabledPlugins // {}) | keys[] | split("@")[0]] + ((.extraKnownMarketplaces // {}) | keys)) | any(IN("kicad-happy","rea")) | not' "$f"
     check "$tag: no permission rule for the removed plugins" \
-        jq -e '[(.permissions // {}) | .allow?, .ask?, .deny? | .[]? | select(test("desktop-commander|plugin_rea_|kicad-happy"))] | length == 0' "$f"
+        jq -e '[(.permissions // {}) | .allow?, .ask?, .deny? | .[]? | select(test("plugin_rea_|kicad-happy"))] | length == 0' "$f"
+    check "$tag: desktop-commander's eight writing tools are on ask (the guard hooks don't see them)" \
+        jq -e '[(.permissions.ask // [])[] | select(startswith("mcp__plugin_desktop-commander_desktop-commander__"))] | length == 8' "$f"
     check "$tag: outputStyle is orchestrator" jq -e '.outputStyle=="orchestrator"' "$f"
     check "$tag: statusLine runs ~/.claude/statusline.sh" jq -e '.statusLine.command=="~/.claude/statusline.sh"' "$f"
     check "$tag: subagentPromptCacheTtl is 1h" jq -e '.subagentPromptCacheTtl=="1h"' "$f"
@@ -376,7 +378,7 @@ check "output style: name is orchestrator" test "$(fm "$OS" name)" = orchestrato
 check "output style: keep-coding-instructions is true" test "$(fm "$OS" keep-coding-instructions)" = true
 check "output style: checks go to verifier" grep -q 'Checks go to `verifier`' "$OS"
 check "output style: the verifier rule overrides the Agent tool's advice" grep -q "overrides the Agent tool's advice to run a check inline" "$OS"
-check "output style: the connector launchers (claude-all, masters)" bash -c "grep -q claude-all '$OS' && grep -q masters '$OS'"
+check "output style: connectors on everywhere, Desktop Commander tools unseen by the guards" bash -c "grep -q 'load in every session' '$OS' && grep -q 'Desktop Commander' '$OS'"
 check "output style: when to use the advisor" grep -q "The advisor is" "$OS"
 for f in "$CM" "$OS"; do
     check "${f##*/}: does not claim Plan follows CLAUDE_CODE_SUBAGENT_MODEL" bash -c "! grep -qiE 'Plan[^.]*fall(s)? back to Sonnet' '$f'"
@@ -459,8 +461,8 @@ EOF
             if grep -q '"agent_type":"deep-reasoner"' "$LOG" && grep -q '"agent_type":"fast-executor"' "$LOG" && grep -q '"agent_type":"general-purpose"' "$LOG"; then ok "L8 SubagentStart logged all three agent types"; else bad "L8 SubagentStart logged all three agent types" "see $LOG"; fi
         fi
         if want L9; then
-            run L9 sonnet "${NOTOOLS[@]}" -- "Without using any tool, answer from your instructions in two lines. Line 1: the name of the shell launcher that starts a session in any folder with the claude.ai connectors on. Line 2: the subagent type that runs tests, builds and validation batches."
-            if grep -q "claude-all" "$BENCH_DIR/L9.txt" && grep -qi "verifier" "$BENCH_DIR/L9.txt"; then ok "L9 orchestrator output style loaded in main session"; else bad "L9 orchestrator output style loaded in main session" "got: $(out L9)"; fi
+            run L9 sonnet "${NOTOOLS[@]}" -- "Without using any tool, answer from your instructions in two lines. Line 1: the plugin whose tools the guard hooks don't see. Line 2: the subagent type that runs tests, builds and validation batches."
+            if grep -qi "desktop.commander" "$BENCH_DIR/L9.txt" && grep -qi "verifier" "$BENCH_DIR/L9.txt"; then ok "L9 orchestrator output style loaded in main session"; else bad "L9 orchestrator output style loaded in main session" "got: $(out L9)"; fi
         fi
         if [ "$KEEP" = 1 ]; then echo "  kept: $BENCH_DIR"; else rm -rf "$BENCH_DIR"; fi
     fi
