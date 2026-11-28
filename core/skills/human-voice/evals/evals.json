@@ -1,0 +1,65 @@
+{
+  "skill_name": "human-voice",
+  "evals": [
+    {
+      "id": 1,
+      "name": "seed-deck-from-facts",
+      "prompt": "make this sound like a human wrote it, not AI. I need the slide text for an 8-slide seed deck: title, body and speaker notes for each slide, as markdown. Facts: we're Kestrel Robotics, 6 people in Almaty. We build an autonomous quadcopter that inspects 35-110 kV power lines with a thermal + RGB camera and flags cracked insulators and hot joints. Pilot with a regional grid operator in Kazakhstan, Jun-Oct 2026: 140 km of line inspected, 23 defects found, 4 of them urgent, which their foot patrols had missed. Foot patrols cover about 8 km per crew-day; we did 31 km per day. Their cost per km by helicopter is about $410; ours came to $95 per km in the pilot including the operator. Problem: drone flights in KZ need a permit per flight zone, which took us 6 weeks for the pilot; we're working with the aviation authority on a standing permit. Team: two of us built flight controllers at a drone company in Shenzhen, one ex-grid engineer with 11 years at the operator. Raising $1.5M seed for 18 months: 3 more drones, certification, and two more utility pilots. Save it as deck.md.",
+      "expected_output": "deck.md with 8 slides; titles state claims with the pilot numbers; bodies carry evidence, not paraphrase; spoken speaker notes; the permit problem appears as an honest risk with the plan; ends on the $1.5M ask, no recap slide; no invented customers, quotes or numbers beyond the facts (gaps as placeholders).",
+      "files": [],
+      "assertions": [
+        "Stock words at most 2 per 1,000 words",
+        "Em dashes at most 2 per 1,000 words",
+        "At most one contrast frame ('not just X but Y', 'X, not Y')",
+        "No recap or summary ending",
+        "No announced-meaning sentences ('this shows that', 'the takeaway')",
+        "No numbers beyond the given facts (ignoring 0-12)",
+        "Has 8 slides",
+        "Permit problem appears as a risk",
+        "Last slide carries the $1.5M ask",
+        "Speaker notes present"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "landing-page-rewrite",
+      "prompt": "this landing page copy sounds like chatgpt wrote it. can you rewrite it so it reads like a person wrote it? keep it markdown, roughly the same sections. save the result as landing.md",
+      "expected_output": "landing.md rewritten: plain headline saying what it is and for whom; keeps the real facts (40 cafes in Almaty and Astana, 9,900 tenge/month, 14-day trial, 15-minute setup, 1C export, founder's eight years as a restaurant accountant, POS import); drops or flags the unsupported claims ('studies show 10 hours', 'leading restaurants', the anonymous testimonial, 'state-of-the-art encryption') instead of inventing replacements; specific calls to action; few stock words, em dashes or contrast frames.",
+      "files": [
+        "evals/files/landing.md"
+      ],
+      "assertions": [
+        "Stock words at most 2 per 1,000 words",
+        "Em dashes at most 2 per 1,000 words",
+        "At most one contrast frame ('not just X but Y', 'X, not Y')",
+        "No recap or summary ending",
+        "No announced-meaning sentences ('this shows that', 'the takeaway')",
+        "No numbers beyond the given facts (ignoring 0-12)",
+        "Keeps the real facts (40 venues, price, trial, setup time, 1C, founder's years)",
+        "Drops the unsupported 'studies show' claim",
+        "Drops the anonymous 'Happy Customer' testimonial",
+        "Drops 'revolutionize'"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "investor-update-email",
+      "prompt": "write our november investor update email. make it sound human, not like an AI wrote it. facts: MRR went from $8.2k to $9.1k. we lost our second-biggest customer (a 12-location coffee chain, about $900/mo) because they got acquired and the new owner uses a competitor. signed 3 new cafes. hired a backend engineer (Dana, starts Dec 1). runway 14 months. we're slipping the inventory feature from December to February because the POS integration took longer than we thought. ask: intros to restaurant groups with 5+ locations in Astana. sign it from Arman. save as email.md",
+      "expected_output": "email.md: subject line plus body; the first lines give the month's headline numbers; the lost customer and the slip are stated plainly and early, with the reason and what's being done; one clear ask with the profile of the intro wanted; no warm-up or 'excited to share'; signed Arman; no invented numbers.",
+      "files": [],
+      "assertions": [
+        "Stock words at most 2 per 1,000 words",
+        "Em dashes at most 2 per 1,000 words",
+        "At most one contrast frame ('not just X but Y', 'X, not Y')",
+        "No recap or summary ending",
+        "No announced-meaning sentences ('this shows that', 'the takeaway')",
+        "No numbers beyond the given facts (ignoring 0-12)",
+        "Headline numbers (MRR) in the first lines",
+        "Lost customer stated",
+        "Slip to February stated",
+        "Ask names Astana groups with 5+ locations",
+        "Signed by Arman"
+      ]
+    }
+  ]
+}

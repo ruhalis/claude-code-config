@@ -25,11 +25,12 @@ cd ~/projects/claude-code-config
 ```
 core/                  source of truth: agents and skills
   agents/*.md            the specialists, in Claude's format
-  skills/*/              global SKILL.md skills: esp-idf, rl-advisor, shopping, anatomy, deep-research, and Emil Kowalski's 20 design and animation skills (symlinks into vendor/)
+  skills/*/              global SKILL.md skills: esp-idf, rl-advisor, shopping, human-voice, anatomy, deep-research, and Emil Kowalski's 20 design and animation skills (symlinks into vendor/)
   skills/anatomy/        submodule: wheresryan22/anatomy, pinned (Claude Code only)
   skills/deep-research/  gitignored local copy (see below)
   vendor/emilkowalski-skills/  submodule: emilkowalski/skills, pinned; each of its skills/<name> is linked as core/skills/<name>
   skills/shopping/       read-only personal shopper for Kazakhstan: store reads (scripts/listing.py), landed cost in KZT, Artifact comparison pages (written for Claude Code: uses Agent and Artifact)
+  skills/human-voice/    on request, writes or rewrites decks, landing pages, emails, posts and docs so they read as written by a person: structure rules from StoryScope (arXiv 2604.03136), surface tells from four studies and Wikipedia's guide, scripts/tells.py checker, never invents facts; English only
   optional-skills/*/     skills linked only into the projects that use them: isaac, led-animation, motor-bench, pcb-design
   optional-skills/projects.txt   which project directories each optional skill is linked into
 adapters/
